@@ -9,6 +9,12 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Sync committee for current period is not initialized.")]
+    SyncCommitteeNotInitialized {},
+
+    #[error("Less than MIN_SYNC_COMMITTEE_PARTICIPANTS signed.")]
+    NotEnoughSyncCommitteeParticipants {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
     // Add any other custom errors you like here.

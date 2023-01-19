@@ -37,11 +37,11 @@ pub struct BeaconBlockHeader {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LightClientStep {
-    finalized_slot: Uint256,
-    participation: Uint256,
-    finalized_header_root: [u8; 32],
-    execution_state_root: [u8; 32],
-    proof: Groth16Proof,
+    pub finalized_slot: Uint256,
+    pub participation: Uint256,
+    pub finalized_header_root: [u8; 32],
+    pub execution_state_root: [u8; 32],
+    pub proof: Groth16Proof,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

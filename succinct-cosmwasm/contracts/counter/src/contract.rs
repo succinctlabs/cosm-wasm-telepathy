@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, StdError};
 use cw2::set_contract_version;
 
 use std::collections::HashMap;
@@ -10,11 +10,13 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{Config, Groth16Proof, BeaconBlockHeader, LightClientStep, LightClientRotate, CONFIG, headers, execution_state_roots, sync_committee_poseidons, best_updates};
 
+use self::query::getSyncCommitteePeriod;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:counter";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const MIN_SIZE_COMMITTEE_PARTICIPANTS: Uint256 = Uint256::from(10u64);
+const MIN_SYNC_COMMITTEE_PARTICIPANTS: Uint256 = Uint256::from(10u64);
 const SYNC_COMMITTEE_SIZE: Uint256 = Uint256::from(512u64);
 const FINALIZED_ROOT_INDEX: Uint256 = Uint256::from(105u64);
 const NEXT_SYNC_COMMITTEE_SIZE: Uint256 = Uint256::from(55u64);
@@ -69,6 +71,9 @@ pub fn execute(
 pub mod execute {
     use super::*;
 
+    pub fn step(update: LightClientStep) {
+        let finalized = processStep(update);
+    }
     pub fn increment(deps: DepsMut) -> Result<Response, ContractError> {
         STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
             state.count += 1;
@@ -98,34 +103,60 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub mod query {
+    use crate::msg::GetSyncCommitteePeriodResponse;
+
     use super::*;
 
-    pub fn getSyncCommitteePeriod(slot: Uint256, deps: Deps) -> StdResult<GetCountResponse> {
-        let state = STATE.load(deps.storage)?;
-        Ok(GetCountResponse { period: slot / state.SLOTS_PER_PERIOD })
+    pub fn getSyncCommitteePeriod(slot: Uint256, deps: Deps) -> StdResult<GetSyncCommitteePeriodResponse> {
+        let period = sync_committee_period(slot, deps)?;
+        Ok(GetSyncCommitteePeriodResponse { period: period })
     }
 }
 
+fn sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
+    let state = CONFIG.load(deps.storage)?;
+    Ok(slot / state.SLOTS_PER_PERIOD)
+}
 
 // HELPER FUNCTIONS
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
+    let state = CONFIG.load(deps.storage)?;
 
     let key = period.to_string();
-    let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key)?;
-    // If key exists
-    if poseidonForPeriod.is_some() {
-
-        // TODO: Add check that poseidon for period is 0 byte array
-        if poseidonForPeriod != Some(poseidon) {
-            CONFIG.update(deps.storage, |mut state| -> Result<_, ContractError> {
-                state.consistent = false;
-                Ok(state)
-            })?;
-        }
+    let poseidonForPeriod = sync_committee_poseidons.load(deps.storage, key)?;
+    // If sync committee does not exist    
+    if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
+        state.consistent = false;
+        return Ok(())
     }
 
     sync_committee_poseidons.save(deps.storage, key, &poseidon)?;
-    Ok(())
+
+    // TODO: Emit event
+    return Ok(())
+
+}
+
+fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
+    // Get current period
+    let currentPeriod = sync_committee_period(update.finalized_slot, deps)?;
+
+    // Load poseidon for period
+    let poseidonForPeriod = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
+
+    if (poseidonForPeriod == [0; 32]) {
+        return Err(ContractError::SyncCommitteeNotInitialized {  });
+    } else if (update.participation < MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+        return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
+    }
+
+    zkLightClientStep(update);
+    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * SYNC_COMMITTEE_SIZE
+    return Ok(bool);
+
+}
+
+fn zk_light_client_step(update: LightClientStep) -> Result<(), ContractError> {
 
 }
 

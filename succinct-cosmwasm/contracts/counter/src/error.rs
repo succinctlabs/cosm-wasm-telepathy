@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("Sync committee for current period is not initialized.")]
     SyncCommitteeNotInitialized {},
 
+    #[error("Update slot is too far in the future")]
+    UpdateSlotTooFar {},
+
     #[error("Less than MIN_SYNC_COMMITTEE_PARTICIPANTS signed.")]
     NotEnoughSyncCommitteeParticipants {},
 

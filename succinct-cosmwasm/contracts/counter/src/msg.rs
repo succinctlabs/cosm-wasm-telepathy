@@ -1,6 +1,8 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint256;
 
+use crate::state::LightClientStep;
+
 #[cw_serde]
 pub struct InstantiateMsg {
     pub genesis_validators_root: [u8; 32],
@@ -13,8 +15,7 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Increment {},
-    Reset { count: i32 },
+    Step {update: LightClientStep},
 }
 
 #[cw_serde]

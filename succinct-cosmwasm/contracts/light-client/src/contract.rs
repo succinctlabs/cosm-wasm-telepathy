@@ -41,10 +41,10 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let config: Config = Config {
-        GENESIS_VALIDATORS_ROOT: msg.genesis_validators_root,
-        GENESIS_TIME: msg.genesis_time,
-        SECONDS_PER_SLOT: msg.seconds_per_slot,
-        SLOTS_PER_PERIOD: msg.slots_per_period,
+        genesis_validators_root: msg.genesis_validators_root,
+        genesis_time: msg.genesis_time,
+        seconds_per_slot: msg.seconds_per_slot,
+        slots_per_period: msg.slots_per_period,
 
         consistent: true,
         head: Uint256::from(0u64),
@@ -195,7 +195,7 @@ pub mod query {
 
 fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = CONFIG.load(deps.storage)?;
-    Ok(slot / state.SLOTS_PER_PERIOD)
+    Ok(slot / state.slots_per_period)
 }
 
 fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
@@ -203,7 +203,7 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     let block = _env.block;
     let timestamp = Uint256::from(block.time.seconds());
     // TODO: Confirm this is timestamp in CosmWasm
-    let currentSlot = timestamp + state.GENESIS_TIME / state.SECONDS_PER_SLOT;
+    let currentSlot = timestamp + state.genesis_time / state.seconds_per_slot;
     return Ok(currentSlot);
 }
 

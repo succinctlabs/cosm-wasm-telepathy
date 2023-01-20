@@ -12,10 +12,10 @@ pub struct Config {
     pub consistent: bool,
     pub head: Uint256,
 
-    pub GENESIS_VALIDATORS_ROOT: [u8; 32],
-    pub GENESIS_TIME: Uint256,
-    pub SECONDS_PER_SLOT: Uint256,
-    pub SLOTS_PER_PERIOD: Uint256,
+    pub genesis_validators_root: [u8; 32],
+    pub genesis_time: Uint256,
+    pub seconds_per_slot: Uint256,
+    pub slots_per_period: Uint256,
 
 }
 

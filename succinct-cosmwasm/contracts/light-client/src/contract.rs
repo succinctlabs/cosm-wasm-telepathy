@@ -6,7 +6,7 @@ use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo
 use cw2::set_contract_version;
 
 use sha2::{Digest, Sha256};
-use byteorder::{LittleEndian, WriteBytesExt};
+// use byteorder::{LittleEndian, WriteBytesExt};
 
 use ssz::{Decode, Encode};
 use crate::error::ContractError;
@@ -274,7 +274,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     // let mut t = Uint256::from_le_bytes(h);
     // Only take first 253 bits (for babyjubjub)
     // Bit math
-    
+
     let mut t = [255u8; 32];
     t[31] = 0b00011111;
 

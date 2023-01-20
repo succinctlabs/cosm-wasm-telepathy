@@ -32,11 +32,14 @@ const EXECUTION_STATE_ROOT_INDEX: u64 = 402;
      *   2) Sets initial sync committee
      */
 pub fn instantiate(
-    deps: DepsMut,
+    mut deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let config: Config = Config {
         GENESIS_VALIDATORS_ROOT: msg.genesis_validators_root,
         GENESIS_TIME: msg.genesis_time,
@@ -49,10 +52,10 @@ pub fn instantiate(
 
     };
     // Set sync committee poseidon
-    set_sync_committee_poseidon(deps, msg.sync_committee_period, msg.sync_committee_poseidon);
+    // TODO: Propogate error up
+    let _response = set_sync_committee_poseidon(deps.branch(), msg.sync_committee_period, msg.sync_committee_poseidon);
 
 
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     CONFIG.save(deps.storage, &config)?;
 
     // TOOD: Update response string
@@ -85,9 +88,9 @@ pub mod execute {
      *   2) A valid finality proof
      *   3) A valid execution state root proof
      */
-    pub fn step(_env: Env, deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
+    pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
 
-        let finalized = process_step(deps.as_ref(), update)?;
+        let finalized = process_step(deps.as_ref(), update.clone())?;
 
         let currentSlot = get_current_slot(_env, deps.as_ref())?;
         if (currentSlot < update.finalized_slot) {
@@ -95,8 +98,8 @@ pub mod execute {
         }
 
         if (finalized) {
-            set_head(deps, update.finalized_slot, update.finalized_header_root);
-            set_execution_state_root(deps, update.finalized_slot, update.execution_state_root);
+            set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
+            set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
         }
 
         // TODO: Add more specifics on response
@@ -110,15 +113,15 @@ pub mod execute {
      */
     pub fn rotate(deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
 
-        let step = update.step;
-        let finalized = process_step(deps.as_ref(), step)?;
+        let step = update.clone().step;
+        let finalized = process_step(deps.as_ref(), step.clone())?;
 
         let currentPeriod = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
 
         let nextPeriod = currentPeriod + Uint256::from(1u64);
 
         //TODO: Finalize zk_light_client_rotate
-        zk_light_client_rotate(deps.as_ref(), update);
+        zk_light_client_rotate(deps.as_ref(), update.clone());
 
         if (finalized) {
             set_sync_committee_poseidon(deps, nextPeriod, update.sync_committee_poseidon);
@@ -224,7 +227,7 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     }
 
     // TODO: Ensure zk_light_client_step is complete
-    zk_light_client_step(deps, update);
+    zk_light_client_step(deps, update.clone());
     
     let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
     return Ok(bool);
@@ -280,17 +283,17 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      * root and emit an event.
      */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
-    let state = CONFIG.load(deps.storage)?;
+    let mut state = CONFIG.load(deps.storage)?;
 
     let key = period.to_string();
-    let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key)?.unwrap_or_default();
+    let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key.clone())?.unwrap_or_default();
     // If sync committee does not exist    
     if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
         state.consistent = false;
         return Ok(())
     }
 
-    sync_committee_poseidons.save(deps.storage, key, &poseidon)?;
+    sync_committee_poseidons.save(deps.storage, key.clone(), &poseidon)?;
 
     // TODO: Emit event
     return Ok(())
@@ -301,11 +304,11 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32
      * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
      */
 fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
-    let state = CONFIG.load(deps.storage)?;
+    let mut state = CONFIG.load(deps.storage)?;
 
     let key = slot.to_string();
 
-    let rootForSlot = headers.may_load(deps.storage, key)?.unwrap_or_default();
+    let rootForSlot = headers.may_load(deps.storage, key.clone())?.unwrap_or_default();
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;
@@ -314,7 +317,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
 
     state.head = slot;
 
-    headers.save(deps.storage, key, &root)?;
+    headers.save(deps.storage, key.clone(), &root)?;
 
     // TODO: Add emit event for HeadUpdate
     return Ok(())
@@ -325,18 +328,18 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
      * it is the execution root for the slot.
      */
 fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
-    let state = CONFIG.load(deps.storage)?;
+    let mut state = CONFIG.load(deps.storage)?;
 
     let key = slot.to_string();
 
-    let rootForSlot = execution_state_roots.may_load(deps.storage, key)?.unwrap_or_default();
+    let rootForSlot = execution_state_roots.may_load(deps.storage, key.clone())?.unwrap_or_default();
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;
         return Ok(())
     }
 
-    execution_state_roots.save(deps.storage, key, &root)?;
+    execution_state_roots.save(deps.storage, key.clone(), &root)?;
     return Ok(())
 }
 
@@ -499,7 +502,7 @@ mod tests {
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));

@@ -159,11 +159,12 @@ pub mod execute {
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetSyncCommitteePeriod { slot } => to_binary(&query::getSyncCommitteePeriod(slot, deps)?),
+        QueryMsg::GetCurrentSlot {} => to_binary(&query::getCurrentSlot(_env, deps)?),
     }
 }
 
 pub mod query {
-    use crate::msg::GetSyncCommitteePeriodResponse;
+    use crate::msg::{GetSyncCommitteePeriodResponse, GetCurrentSlotResponse};
 
     use super::*;
 
@@ -171,14 +172,21 @@ pub mod query {
         let period = get_sync_committee_period(slot, deps)?;
         Ok(GetSyncCommitteePeriodResponse { period: period })
     }
+
+    pub fn getCurrentSlot(_env: Env, deps: Deps) -> StdResult<GetCurrentSlotResponse> {
+        let slot = get_current_slot(_env, deps)?;
+        Ok(GetCurrentSlotResponse { slot: slot })
+    }
 }
+
+// View functions
 
 fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = CONFIG.load(deps.storage)?;
     Ok(slot / state.SLOTS_PER_PERIOD)
 }
 
-fn get_current_slot(_env: Env, deps: Deps) -> Result<Uint256, ContractError> {
+fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     let state = CONFIG.load(deps.storage)?;
     let block = _env.block;
     let timestamp = Uint256::from(block.time.seconds());
@@ -244,6 +252,8 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
 
     Ok(())
 }
+
+// State interaction functions
 
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
     let state = CONFIG.load(deps.storage)?;

@@ -1,4 +1,3 @@
-use alloc::sync;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, StdError};
@@ -319,7 +318,15 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
+        // TODO: Update default msg with values from Gnosis
+        let msg = InstantiateMsg { 
+            genesis_validators_root: [0; 32],
+            genesis_time: Uint256::from(0u64),
+            seconds_per_slot: Uint256::from(0u64),
+            slots_per_period: Uint256::from(0u64),
+            sync_committee_period: Uint256::from(0u64),
+            sync_committee_poseidon: [0; 32], 
+        };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -327,83 +334,141 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
+        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        // let value: GetCountResponse = from_binary(&res).unwrap();
+        // assert_eq!(17, value.count);
     }
 
     #[test]
     fn step() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let msg = InstantiateMsg { 
+            genesis_validators_root: [0; 32],
+            genesis_time: Uint256::from(0u64),
+            seconds_per_slot: Uint256::from(0u64),
+            slots_per_period: Uint256::from(0u64),
+            sync_committee_period: Uint256::from(0u64),
+            sync_committee_poseidon: [0; 32], 
+        };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
+
+        let proof = Groth16Proof {
+            a: [Uint256::from(0u64); 2],
+            b: [[Uint256::from(0u64); 2]; 2],
+            c: [Uint256::from(0u64); 2],
+        };
+
+        let update = LightClientStep {
+            finalized_slot: Uint256::from(0u64),
+            participation: Uint256::from(0u64),
+            finalized_header_root: [0; 32],
+            execution_state_root: [0; 32],
+            proof: proof
+        };
+
+        let msg = ExecuteMsg::Step {update: update};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
+        // should complete a step
+
+        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        // let value: GetCountResponse = from_binary(&res).unwrap();
+        // assert_eq!(18, value.count);
     }
 
     #[test]
     fn rotate() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let msg = InstantiateMsg { 
+            genesis_validators_root: [0; 32],
+            genesis_time: Uint256::from(0u64),
+            seconds_per_slot: Uint256::from(0u64),
+            slots_per_period: Uint256::from(0u64),
+            sync_committee_period: Uint256::from(0u64),
+            sync_committee_poseidon: [0; 32], 
+        };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        let info = mock_info("anyone", &coins(2, "token"));
 
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+        let proof = Groth16Proof {
+            a: [Uint256::from(0u64); 2],
+            b: [[Uint256::from(0u64); 2]; 2],
+            c: [Uint256::from(0u64); 2],
+        };
 
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        let step = LightClientStep {
+            finalized_slot: Uint256::from(0u64),
+            participation: Uint256::from(0u64),
+            finalized_header_root: [0; 32],
+            execution_state_root: [0; 32],
+            proof: proof
+        };
+
+        let sszProof = Groth16Proof {
+            a: [Uint256::from(0u64); 2],
+            b: [[Uint256::from(0u64); 2]; 2],
+            c: [Uint256::from(0u64); 2],
+        };
+
+        let update: LightClientRotate = LightClientRotate {
+            step: step,
+            sync_committee_ssz: [0; 32],
+            sync_committee_poseidon: [0; 32],
+            proof: sszProof, 
+        };
+
+        let msg = ExecuteMsg::Rotate {update: update};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // should complete a rotate
+
+        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        // let value: GetCountResponse = from_binary(&res).unwrap();
+        // assert_eq!(18, value.count);
     }
 
     #[test]
     fn force() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let msg = InstantiateMsg { 
+            genesis_validators_root: [0; 32],
+            genesis_time: Uint256::from(0u64),
+            seconds_per_slot: Uint256::from(0u64),
+            slots_per_period: Uint256::from(0u64),
+            sync_committee_period: Uint256::from(0u64),
+            sync_committee_poseidon: [0; 32], 
+        };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        let info = mock_info("anyone", &coins(2, "token"));
 
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+        let period = Uint256::from(0u64);
 
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        let msg = ExecuteMsg::Force {period: period};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // should complete a force operation
+
+        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        // let value: GetCountResponse = from_binary(&res).unwrap();
+        // assert_eq!(18, value.count);
     }
 }

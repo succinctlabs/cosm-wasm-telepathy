@@ -21,6 +21,15 @@ pub enum ContractError {
     #[error("There exists a better update")]
     ExistsBetterUpdate {},
 
+    #[error("Best update was never initialized")]
+    BestUpdateNotInitialized {},
+
+    #[error("Sync committee for next period already initialized.")]
+    SyncCommitteeAlreadyInitialized {},
+
+    #[error("Must wait for current sync committee period to end.")]
+    CurrentSyncCommitteeNotEnded {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
     // Add any other custom errors you like here.

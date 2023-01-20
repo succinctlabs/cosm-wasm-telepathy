@@ -63,15 +63,22 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Step { update } => execute::step(_env, deps, update),
-        ExecuteMsg::Rotate { update } => execute::rotate(_env, deps, update),
+        ExecuteMsg::Rotate { update } => execute::rotate(deps, update),
+        ExecuteMsg::Force { period } => execute::force(_env, deps, period),
     }
 }
 
 pub mod execute {
     use super::*;
-
+    /*
+     * @dev Updates the head of the light client. The conditions for updating
+     * involve checking the existence of:
+     *   1) At least 2n/3+1 signatures from the current sync committee for n=512
+     *   2) A valid finality proof
+     *   3) A valid execution state root proof
+     */
     pub fn step(_env: Env, deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
-        // TODO: Check if deps.as_ref() is correct
+
         let finalized = process_step(deps.as_ref(), update)?;
 
         let currentSlot = get_current_slot(_env, deps.as_ref())?;
@@ -87,8 +94,14 @@ pub mod execute {
         // TODO: Add more specifics on response
         Ok(Response::new().add_attribute("action", "step"))
     }
-    pub fn rotate(_env: Env, deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
-        // TODO: Check if deps.as_ref() is correct
+    /*
+     * @dev Sets the sync committee validator set root for the next sync
+     * committee period. This root is signed by the current sync committee. In
+     * the case there is no finalization, we will keep track of the best
+     * optimistic update.
+     */
+    pub fn rotate(deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
+
         let step = update.step;
         let finalized = process_step(deps.as_ref(), step)?;
 
@@ -111,8 +124,35 @@ pub mod execute {
         }
 
         // TODO: Add more specifics on response
-        Ok(Response::new().add_attribute("action", "step"))
+        Ok(Response::new().add_attribute("action", "rotate"))
     }
+    /*
+    * @dev In the case that there is no finalization for a sync committee
+    * rotation, applies the update with the most signatures throughout the
+    * period.
+    */
+    pub fn force(_env: Env, deps: DepsMut, period: Uint256) -> Result<Response, ContractError>{
+        // TODO: Check if deps.as_ref() is correct
+        let update = best_updates.load(deps.storage, period.to_string())?;
+        let nextPeriod = period + Uint256::from(1u64);
+
+        let nextSyncCommitteePoseidon = sync_committee_poseidons.may_load(deps.storage, nextPeriod.to_string())?.unwrap_or_default();
+        let slot = get_current_slot(_env, deps.as_ref())?;
+
+        if (update.step.finalized_header_root == [0; 32]) {
+            return Err(ContractError::BestUpdateNotInitialized {});
+        } else if (nextSyncCommitteePoseidon != [0; 32]) {
+            return Err(ContractError::SyncCommitteeAlreadyInitialized {});
+        } else if (get_sync_committee_period(slot, deps.as_ref())? < nextPeriod) {
+            return Err(ContractError::CurrentSyncCommitteeNotEnded {});
+        }
+
+        set_sync_committee_poseidon(deps, nextPeriod, update.sync_committee_poseidon);
+
+        // TODO: Add more specifics on response
+        Ok(Response::new().add_attribute("action", "force"))
+    }
+    
     
 }
 
@@ -210,7 +250,7 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32
     let state = CONFIG.load(deps.storage)?;
 
     let key = period.to_string();
-    let poseidonForPeriod = sync_committee_poseidons.load(deps.storage, key)?;
+    let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key)?.unwrap_or_default();
     // If sync committee does not exist    
     if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
         state.consistent = false;
@@ -229,7 +269,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
 
     let key = slot.to_string();
 
-    let rootForSlot = headers.load(deps.storage, key)?;
+    let rootForSlot = headers.may_load(deps.storage, key)?.unwrap_or_default();
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;
@@ -240,7 +280,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
 
     headers.save(deps.storage, key, &root)?;
 
-    // TODO: Add event for HeadUpdate
+    // TODO: Add emit event for HeadUpdate
     return Ok(())
 }
 
@@ -249,7 +289,7 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Res
 
     let key = slot.to_string();
 
-    let rootForSlot = execution_state_roots.load(deps.storage, key)?;
+    let rootForSlot = execution_state_roots.may_load(deps.storage, key)?.unwrap_or_default();
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;
@@ -293,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn increment() {
+    fn step() {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { count: 17 };
@@ -312,7 +352,35 @@ mod tests {
     }
 
     #[test]
-    fn reset() {
+    fn rotate() {
+        let mut deps = mock_dependencies();
+
+        let msg = InstantiateMsg { count: 17 };
+        let info = mock_info("creator", &coins(2, "token"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // beneficiary can release it
+        let unauth_info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // only the original creator can reset the counter
+        let auth_info = mock_info("creator", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+
+        // should now be 5
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: GetCountResponse = from_binary(&res).unwrap();
+        assert_eq!(5, value.count);
+    }
+
+    #[test]
+    fn force() {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { count: 17 };

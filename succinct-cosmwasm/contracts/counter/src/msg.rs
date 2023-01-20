@@ -17,6 +17,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Step {update: LightClientStep},
     Rotate {update: LightClientRotate},
+    Force {period: Uint256},
 }
 
 

@@ -40,6 +40,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
+byteorder = "1.4.3"
 cosmwasm-schema = "1.1.2"
 cosmwasm-std = "1.1.2"
 cosmwasm-storage = "1.1.2"
@@ -48,6 +49,7 @@ cw2 = "0.13.2"
 eth2_ssz = "0.4.0"
 schemars = "0.8.8"
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
+sha2 = "0.10.6"
 thiserror = { version = "1.0.31" }
 
 [dev-dependencies]

@@ -5,6 +5,9 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, StdError};
 use cw2::set_contract_version;
 
+use sha2::{Digest, Sha256};
+use byteorder::{LittleEndian, WriteBytesExt};
+
 use ssz::{Decode, Encode};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -97,7 +100,7 @@ pub mod execute {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
-        if (finalized) {
+        if finalized {
             set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
             set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
         }
@@ -123,7 +126,7 @@ pub mod execute {
         //TODO: Finalize zk_light_client_rotate
         zk_light_client_rotate(deps.as_ref(), update.clone());
 
-        if (finalized) {
+        if finalized {
             set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
         } else {
             // TODO: load is if definitely there, if not there, must do may load
@@ -145,20 +148,20 @@ pub mod execute {
     pub fn force(_env: Env, deps: DepsMut, period: Uint256) -> Result<Response, ContractError>{
         // TODO: Check if deps.as_ref() is correct
         let update = best_updates.load(deps.storage, period.to_string())?;
-        let nextPeriod = period + Uint256::from(1u64);
+        let next_period = period + Uint256::from(1u64);
 
-        let nextSyncCommitteePoseidon = sync_committee_poseidons.may_load(deps.storage, nextPeriod.to_string())?.unwrap_or_default();
+        let next_sync_committee_poseidon = sync_committee_poseidons.may_load(deps.storage, next_period.to_string())?.unwrap_or_default();
         let slot = get_current_slot(_env, deps.as_ref())?;
 
-        if (update.step.finalized_header_root == [0; 32]) {
+        if update.step.finalized_header_root == [0; 32] {
             return Err(ContractError::BestUpdateNotInitialized {});
-        } else if (nextSyncCommitteePoseidon != [0; 32]) {
+        } else if next_sync_committee_poseidon != [0; 32] {
             return Err(ContractError::SyncCommitteeAlreadyInitialized {});
-        } else if (get_sync_committee_period(slot, deps.as_ref())? < nextPeriod) {
+        } else if get_sync_committee_period(slot, deps.as_ref())? < next_period {
             return Err(ContractError::CurrentSyncCommitteeNotEnded {});
         }
 
-        set_sync_committee_poseidon(deps, nextPeriod, update.sync_committee_poseidon);
+        set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
 
         // TODO: Add more specifics on response
         Ok(Response::new().add_attribute("action", "force"))
@@ -235,20 +238,52 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
 }
 
 
-
 // TODO: Implement Logic
     /*
     * @dev Proof logic for step!
     */
 fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), ContractError> {
-    // Convert finalizedSlot, participation to little endian with ssz
+    // Set up initial bytes
+    let finalizedSlotLE = update.finalized_slot.to_le_bytes();
+    let participationLE = update.participation.to_le_bytes();
+    let currentPeriod = get_sync_committee_period(update.finalized_slot, deps)?;
+    let syncCommitteePoseidon = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
 
-    // getSyncCommitteePeriod & syncCommitteePoseidon
 
-
+    let mut h = [0u8; 32];
+    let mut temp = [0u8; 64];
     // sha256 & combine inputs
+    temp[..32].copy_from_slice(&finalizedSlotLE);
+    temp[32..].copy_from_slice(&participationLE);
+    h.copy_from_slice(&Sha256::digest(&temp));
 
+    temp[..32].copy_from_slice(&h);
+    temp[32..].copy_from_slice(&participationLE);
+    h.copy_from_slice(&Sha256::digest(&temp));
+
+    temp[..32].copy_from_slice(&h);
+    temp[32..].copy_from_slice(&update.execution_state_root);
+    h.copy_from_slice(&Sha256::digest(&temp));
+
+    temp[..32].copy_from_slice(&h);
+    temp[32..].copy_from_slice(&syncCommitteePoseidon);
+    h.copy_from_slice(&Sha256::digest(&temp));
+
+    // Make h little endian
+    // TODO: Confirm this is the correct math!
+    // let mut t = Uint256::from_le_bytes(h);
+    // Only take first 253 bits (for babyjubjub)
+    // Bit math
+    
+    let mut t = [255u8; 32];
+    t[31] = 0b00011111;
+
+    for i in 0..32 {
+        t[i] = t[i] & h[i];
+    }
     // call verifyProofStep
+    let proof = update.clone().proof;
+    let inputs = vec![t];
     // TODO: Figure out how to use arkworks from wasm and vkey file
 
 

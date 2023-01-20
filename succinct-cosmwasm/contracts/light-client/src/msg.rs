@@ -1,7 +1,17 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Uint256;
+use cosmwasm_std::{Uint128, Uint256};
 
 use crate::state::{LightClientStep, LightClientRotate};
+
+use std::convert::TryInto;
+use std::str::FromStr;
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
+use ark_ff::{Fp256, QuadExtField};
+use ark_groth16::Proof;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -42,4 +52,99 @@ pub struct GetSyncCommitteePeriodResponse {
 #[cw_serde]
 pub struct GetCurrentSlotResponse {
     pub slot: Uint256
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct PublicSignals(pub Vec<String>);
+
+// Public signals from circom
+// public [root, nullifierHash, recipient, relayer, fee]
+impl PublicSignals {
+    pub fn from(public_signals: Vec<String>) -> Self {
+        PublicSignals(public_signals)
+    }
+    pub fn from_values(
+        root: String,
+        nullifier_hash: String,
+        recipient: String,
+        relayer: String,
+        fee: Uint128,
+    ) -> Self {
+        let mut signals: Vec<String> = Vec::new();
+        signals.push(root);
+        signals.push(nullifier_hash);
+        signals.push(PublicSignals::bech32_to_u256(recipient));
+        signals.push(PublicSignals::bech32_to_u256(relayer));
+        signals.push(fee.to_string());
+
+        PublicSignals(signals)
+    }
+    pub fn from_json(public_signals_json: String) -> Self {
+        let v: Vec<String> = serde_json::from_str(&public_signals_json).unwrap();
+        PublicSignals(v)
+    }
+
+    pub fn get(self) -> Vec<Fr> {
+        let mut inputs: Vec<Fr> = Vec::new();
+        for input in self.0 {
+            inputs.push(Fr::from_str(&input).unwrap());
+        }
+        inputs
+    }
+
+    fn bech32_to_u256(addr: String) -> String {
+        if addr == "" || addr == "0" {
+            return "0".to_string();
+        }
+        let (_, payloads, _) = bech32::decode(&addr).unwrap();
+
+        let words: Vec<u8> = payloads.iter().map(|x| x.to_u8()).collect();
+        // TODO: take a look at a cleaner way
+        Uint256::from_be_bytes(words.try_into().unwrap()).to_string()
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CircomProof {
+    #[serde(rename = "pi_a")]
+    pub pi_a: Vec<String>,
+    #[serde(rename = "pi_b")]
+    pub pi_b: Vec<Vec<String>>,
+    #[serde(rename = "pi_c")]
+    pub pi_c: Vec<String>,
+    pub protocol: String,
+    pub curve: String,
+}
+
+impl CircomProof {
+    pub fn from(json_str: String) -> Self {
+        serde_json::from_str(&json_str).unwrap()
+    }
+
+    pub fn to_proof(self) -> Proof<Bn254> {
+        let a = G1Affine::new(
+            Fp256::from_str(&self.pi_a[0]).unwrap(),
+            Fp256::from_str(&self.pi_a[1]).unwrap(),
+            false
+        );
+        let b = G2Affine::new(
+            QuadExtField::new(
+                Fp256::from_str(&self.pi_b[0][0]).unwrap(),
+                Fp256::from_str(&self.pi_b[0][1]).unwrap(),
+            ),
+            QuadExtField::new(
+                Fp256::from_str(&self.pi_b[1][0]).unwrap(),
+                Fp256::from_str(&self.pi_b[1][1]).unwrap(),
+            ),
+            false
+        );
+
+        let c = G1Affine::new(
+            Fp256::from_str(&self.pi_c[0]).unwrap(),
+            Fp256::from_str(&self.pi_c[1]).unwrap(),
+            false
+        );
+        Proof { a, b, c }
+    }
 }

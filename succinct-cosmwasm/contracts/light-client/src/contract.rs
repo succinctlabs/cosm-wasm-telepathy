@@ -298,7 +298,7 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
     let proof = update.clone().proof;
 
     let inputs = [Uint256::from(0u64); 65];
-    
+
     // Convert finalizedSlot, participation to little endian with ssz
 
     // getSyncCommitteePeriod & syncCommitteePoseidon

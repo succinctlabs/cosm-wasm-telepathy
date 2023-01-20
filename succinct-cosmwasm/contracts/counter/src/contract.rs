@@ -8,7 +8,6 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{Config, Groth16Proof, BeaconBlockHeader, LightClientStep, LightClientRotate, CONFIG, headers, execution_state_roots, sync_committee_poseidons, best_updates};
 
-use self::query::getSyncCommitteePeriod;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:counter";
@@ -22,6 +21,11 @@ const EXECUTION_STATE_ROOT_INDEX: Uint256 = Uint256::from(402u64);
 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+    /*
+     * @dev Contract constructor!
+     *   1) Sets default variables 
+     *   2) Sets initial sync committee
+     */
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -197,6 +201,9 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 
 // HELPER FUNCTIONS
 
+    /*
+     * @dev Check validity of conditions for a light client step update.
+     */
 
 fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
     // Get current period
@@ -222,6 +229,9 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
 
 
 // TODO: Implement Logic
+    /*
+    * @dev Proof logic for step!
+    */
 fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), ContractError> {
     // Convert finalizedSlot, participation to little endian with ssz
 
@@ -238,6 +248,9 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
 }
 
 // TODO: Implement Logic
+    /*
+    * @dev Proof logic for rotate!
+    */
 fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), ContractError> {
     // Convert finalizedSlot, participation to little endian with ssz
 
@@ -255,6 +268,12 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
 
 // State interaction functions
 
+    /*
+     * @dev Sets the sync committee validator set root for the next sync
+     * committee period. If the root is already set and the new root does not
+     * match, the contract is marked as inconsistent. Otherwise, we store the
+     * root and emit an event.
+     */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
     let state = CONFIG.load(deps.storage)?;
 
@@ -273,6 +292,9 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32
 
 }
 
+    /*
+     * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
+     */
 fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
     let state = CONFIG.load(deps.storage)?;
 
@@ -293,6 +315,10 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
     return Ok(())
 }
 
+    /*
+     * @dev Update execution root as long as it is consistent with the current head or 
+     * it is the execution root for the slot.
+     */
 fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
     let state = CONFIG.load(deps.storage)?;
 
@@ -309,6 +335,9 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Res
     return Ok(())
 }
 
+    /*
+     * @dev Save the best update for the period.
+     */
 fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
     let periodStr = period.to_string();
     // TODO: Confirm save is the correct usage

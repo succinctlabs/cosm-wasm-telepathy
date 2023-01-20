@@ -8,6 +8,7 @@ use std::str::FromStr;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str};
 
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
 use ark_ff::{Fp256, QuadExtField};
@@ -119,10 +120,14 @@ pub struct CircomProof {
 
 impl CircomProof {
     pub fn from(json_str: String) -> Self {
-        serde_json::from_str(&json_str).unwrap()
+        println!("json_str: {}", json_str);
+        let unwrapped_json: CircomProof = serde_json::from_str(&json_str).expect("JSON was not well-formatted");
+        println!("unwrapped_json: {:?}", unwrapped_json);
+        return unwrapped_json;
     }
 
     pub fn to_proof(self) -> Proof<Bn254> {
+        println!("pi_a: {:?}", self.pi_a);
         let a = G1Affine::new(
             Fp256::from_str(&self.pi_a[0]).unwrap(),
             Fp256::from_str(&self.pi_a[1]).unwrap(),

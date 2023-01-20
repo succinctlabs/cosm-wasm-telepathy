@@ -92,8 +92,8 @@ pub mod execute {
 
         let finalized = process_step(deps.as_ref(), update.clone())?;
 
-        let currentSlot = get_current_slot(_env, deps.as_ref())?;
-        if (currentSlot < update.finalized_slot) {
+        let current_slot = get_current_slot(_env, deps.as_ref())?;
+        if current_slot < update.finalized_slot {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
@@ -116,22 +116,22 @@ pub mod execute {
         let step = update.clone().step;
         let finalized = process_step(deps.as_ref(), step.clone())?;
 
-        let currentPeriod = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
+        let current_period = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
 
-        let nextPeriod = currentPeriod + Uint256::from(1u64);
+        let next_period = current_period + Uint256::from(1u64);
 
         //TODO: Finalize zk_light_client_rotate
         zk_light_client_rotate(deps.as_ref(), update.clone());
 
         if (finalized) {
-            set_sync_committee_poseidon(deps, nextPeriod, update.sync_committee_poseidon);
+            set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
         } else {
             // TODO: load is if definitely there, if not there, must do may load
-            let bestUpdate = best_updates.load(deps.storage, currentPeriod.to_string())?;
-            if (step.participation < bestUpdate.step.participation) {
+            let best_update = best_updates.load(deps.storage, current_period.to_string())?;
+            if (step.participation < best_update.step.participation) {
                 return Err(ContractError::ExistsBetterUpdate {});
             }
-            set_best_update(deps, currentPeriod, update);
+            set_best_update(deps, current_period, update);
         }
 
         // TODO: Add more specifics on response
@@ -203,8 +203,8 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     let block = _env.block;
     let timestamp = Uint256::from(block.time.seconds());
     // TODO: Confirm this is timestamp in CosmWasm
-    let currentSlot = timestamp + state.genesis_time / state.seconds_per_slot;
-    return Ok(currentSlot);
+    let current_slot = timestamp + state.genesis_time / state.seconds_per_slot;
+    return Ok(current_slot);
 }
 
 // HELPER FUNCTIONS
@@ -215,14 +215,14 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 
 fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
     // Get current period
-    let currentPeriod = get_sync_committee_period(update.finalized_slot, deps)?;
+    let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
 
     // Load poseidon for period
-    let syncCommitteePoseidon = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
+    let sync_committee_poseidon = sync_committee_poseidons.load(deps.storage, current_period.to_string())?;
 
-    if (syncCommitteePoseidon == [0; 32]) {
+    if sync_committee_poseidon == [0; 32] {
         return Err(ContractError::SyncCommitteeNotInitialized {  });
-    } else if (update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS)) {
+    } else if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
     }
 

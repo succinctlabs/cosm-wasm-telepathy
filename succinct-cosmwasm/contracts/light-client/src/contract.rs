@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, StdError};
@@ -13,11 +15,14 @@ use crate::state::{Config, Groth16Proof, BeaconBlockHeader, LightClientStep, Lig
 const CONTRACT_NAME: &str = "crates.io:counter";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const MIN_SYNC_COMMITTEE_PARTICIPANTS: Uint256 = Uint256::from(10u64);
-const SYNC_COMMITTEE_SIZE: Uint256 = Uint256::from(512u64);
-const FINALIZED_ROOT_INDEX: Uint256 = Uint256::from(105u64);
-const NEXT_SYNC_COMMITTEE_SIZE: Uint256 = Uint256::from(55u64);
-const EXECUTION_STATE_ROOT_INDEX: Uint256 = Uint256::from(402u64);
+// constants
+// TODO: Can't set up as constants b/c of function call
+// const MIN_SYNC_COMMITTEE_PARTICIPANTS: Uint256 = Uint256::from(10u64);
+const MIN_SYNC_COMMITTEE_PARTICIPANTS: u64 = 10;
+const SYNC_COMMITTEE_SIZE: u64 = 512;
+const FINALIZED_ROOT_INDEX: u64 = 105;
+const NEXT_SYNC_COMMITTEE_SIZE: u64 = 55;
+const EXECUTION_STATE_ROOT_INDEX: u64 = 402;
 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -214,14 +219,14 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
 
     if (syncCommitteePoseidon == [0; 32]) {
         return Err(ContractError::SyncCommitteeNotInitialized {  });
-    } else if (update.participation < MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+    } else if (update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS)) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
     }
 
     // TODO: Ensure zk_light_client_step is complete
     zk_light_client_step(deps, update);
     
-    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * SYNC_COMMITTEE_SIZE;
+    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
     return Ok(bool);
 
 }

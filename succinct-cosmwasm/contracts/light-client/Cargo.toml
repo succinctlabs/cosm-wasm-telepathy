@@ -1,5 +1,5 @@
 [package]
-name = "counter"
+name = "light-client"
 version = "0.1.0"
 authors = ["Supanat Potiwarakorn <supanat.ptk@gmail.com>"]
 edition = "2021"

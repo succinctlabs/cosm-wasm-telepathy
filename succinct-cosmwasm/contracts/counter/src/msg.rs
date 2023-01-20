@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint256;
 
-use crate::state::LightClientStep;
+use crate::state::{LightClientStep, LightClientRotate};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -16,7 +16,10 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Step {update: LightClientStep},
+    Rotate {update: LightClientRotate},
 }
+
+
 
 #[cw_serde]
 #[derive(QueryResponses)]

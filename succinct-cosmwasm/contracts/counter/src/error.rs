@@ -18,6 +18,9 @@ pub enum ContractError {
     #[error("Less than MIN_SYNC_COMMITTEE_PARTICIPANTS signed.")]
     NotEnoughSyncCommitteeParticipants {},
 
+    #[error("There exists a better update")]
+    ExistsBetterUpdate {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
     // Add any other custom errors you like here.

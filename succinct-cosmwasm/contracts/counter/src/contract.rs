@@ -63,6 +63,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Step { update } => execute::step(_env, deps, update),
+        ExecuteMsg::Rotate { update } => execute::rotate(_env, deps, update),
     }
 }
 
@@ -86,6 +87,32 @@ pub mod execute {
         // TODO: Add more specifics on response
         Ok(Response::new().add_attribute("action", "step"))
     }
+    pub fn rotate(_env: Env, deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
+        // TODO: Check if deps.as_ref() is correct
+        let step = update.step;
+        let finalized = process_step(deps.as_ref(), step)?;
+
+        let currentPeriod = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
+
+        let nextPeriod = currentPeriod + Uint256::from(1u64);
+
+        //TODO: Finalize zk_light_client_rotate
+        zk_light_client_rotate(deps.as_ref(), update);
+
+        if (finalized) {
+            set_sync_committee_poseidon(deps, nextPeriod, update.sync_committee_poseidon);
+        } else {
+            // TODO: load is if definitely there, if not there, must do may load
+            let bestUpdate = best_updates.load(deps.storage, currentPeriod.to_string())?;
+            if (step.participation < bestUpdate.step.participation) {
+                return Err(ContractError::ExistsBetterUpdate {});
+            }
+            set_best_update(deps, currentPeriod, update);
+        }
+
+        // TODO: Add more specifics on response
+        Ok(Response::new().add_attribute("action", "step"))
+    }
     
 }
 
@@ -102,17 +129,83 @@ pub mod query {
     use super::*;
 
     pub fn getSyncCommitteePeriod(slot: Uint256, deps: Deps) -> StdResult<GetSyncCommitteePeriodResponse> {
-        let period = sync_committee_period(slot, deps)?;
+        let period = get_sync_committee_period(slot, deps)?;
         Ok(GetSyncCommitteePeriodResponse { period: period })
     }
 }
 
-fn sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
+fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = CONFIG.load(deps.storage)?;
     Ok(slot / state.SLOTS_PER_PERIOD)
 }
 
+fn get_current_slot(_env: Env, deps: Deps) -> Result<Uint256, ContractError> {
+    let state = CONFIG.load(deps.storage)?;
+    let block = _env.block;
+    let timestamp = Uint256::from(block.time.seconds());
+    // TODO: Confirm this is timestamp in CosmWasm
+    let currentSlot = timestamp + state.GENESIS_TIME / state.SECONDS_PER_SLOT;
+    return Ok(currentSlot);
+}
+
 // HELPER FUNCTIONS
+
+
+fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
+    // Get current period
+    let currentPeriod = get_sync_committee_period(update.finalized_slot, deps)?;
+
+    // Load poseidon for period
+    let syncCommitteePoseidon = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
+
+    if (syncCommitteePoseidon == [0; 32]) {
+        return Err(ContractError::SyncCommitteeNotInitialized {  });
+    } else if (update.participation < MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+        return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
+    }
+
+    // TODO: Ensure zk_light_client_step is complete
+    zk_light_client_step(deps, update);
+    
+    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * SYNC_COMMITTEE_SIZE;
+    return Ok(bool);
+
+}
+
+
+
+// TODO: Implement Logic
+fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), ContractError> {
+    // Convert finalizedSlot, participation to little endian with ssz
+
+    // getSyncCommitteePeriod & syncCommitteePoseidon
+
+
+    // sha256 & combine inputs
+
+    // call verifyProofStep
+    // TODO: Figure out how to use arkworks from wasm and vkey file
+
+
+    Ok(())
+}
+
+// TODO: Implement Logic
+fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), ContractError> {
+    // Convert finalizedSlot, participation to little endian with ssz
+
+    // getSyncCommitteePeriod & syncCommitteePoseidon
+
+
+    // sha256 & combine inputs
+
+    // call verifyProofStep
+    // TODO: Figure out how to use arkworks from wasm and vkey file
+
+
+    Ok(())
+}
+
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
     let state = CONFIG.load(deps.storage)?;
 
@@ -129,52 +222,6 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32
     // TODO: Emit event
     return Ok(())
 
-}
-
-fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
-    // Get current period
-    let currentPeriod = sync_committee_period(update.finalized_slot, deps)?;
-
-    // Load poseidon for period
-    let syncCommitteePoseidon = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
-
-    if (syncCommitteePoseidon == [0; 32]) {
-        return Err(ContractError::SyncCommitteeNotInitialized {  });
-    } else if (update.participation < MIN_SYNC_COMMITTEE_PARTICIPANTS) {
-        return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
-    }
-
-    // TODO: Ensure zk_light_client_step is complete
-    zk_light_client_step(update);
-    
-    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * SYNC_COMMITTEE_SIZE;
-    return Ok(bool);
-
-}
-
-fn get_current_slot(_env: Env, deps: Deps) -> Result<Uint256, ContractError> {
-    let state = CONFIG.load(deps.storage)?;
-    let block = _env.block;
-    let timestamp = Uint256::from(block.time.seconds());
-    // TODO: Confirm this is timestamp in CosmWasm
-    let currentSlot = timestamp + state.GENESIS_TIME / state.SECONDS_PER_SLOT;
-    return Ok(currentSlot);
-}
-
-// TODO: Implement Logic
-fn zk_light_client_step(update: LightClientStep) -> Result<(), ContractError> {
-    // Convert finalizedSlot, participation to little endian with ssz
-
-    // getSyncCommitteePeriod & syncCommitteePoseidon
-
-
-    // sha256 & combine inputs
-
-    // call verifyProofStep
-    // TODO: Figure out how to use arkworks from wasm and vkey file
-
-
-    Ok(())
 }
 
 fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
@@ -211,6 +258,12 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Res
 
     execution_state_roots.save(deps.storage, key, &root)?;
     return Ok(())
+}
+
+fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
+    let periodStr = period.to_string();
+    // TODO: Confirm save is the correct usage
+    best_updates.save(deps.storage, periodStr, &update);
 }
 
 

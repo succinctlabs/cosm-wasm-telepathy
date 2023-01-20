@@ -46,10 +46,10 @@ pub struct LightClientStep {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct LightClientRotate {
-    step: LightClientStep,
-    sync_committee_ssz: [u8; 32],
-    sync_committee_poseidon: [u8; 32],
-    proof: Groth16Proof,
+    pub step: LightClientStep,
+    pub sync_committee_ssz: [u8; 32],
+    pub sync_committee_poseidon: [u8; 32],
+    pub proof: Groth16Proof,
 }
 
 // Taking in a string of the uint256 for all of the below

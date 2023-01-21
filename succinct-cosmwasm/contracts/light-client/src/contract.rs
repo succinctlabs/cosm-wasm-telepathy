@@ -5,6 +5,7 @@ use std::str::{FromStr, from_utf8};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint256, StdError};
 use cw2::set_contract_version;
+use hex::{encode, decode};
 
 use sha2::{Digest, Sha256};
 // use byteorder::{LittleEndian, WriteBytesExt};
@@ -457,12 +458,12 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: "043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb".as_bytes().to_vec(),
+            genesis_validators_root: hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap(),
             genesis_time: Uint256::from(0u64),
             seconds_per_slot: Uint256::from(0u64),
             slots_per_period: Uint256::from(0u64),
             sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: "7032059424740925146199071046477651269705772793323287102921912953216115444414".as_bytes().to_vec(), 
+            sync_committee_poseidon: Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes().to_vec(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -473,25 +474,27 @@ mod tests {
         let info = mock_info("anyone", &coins(2, "token"));
 
         let proof = Groth16Proof {
-            a: vec!["0".to_string(), "0".to_string()],
-            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
-            c: vec!["0".to_string(), "0".to_string()],
+            a: vec!["14717729948616455402271823418418032272798439132063966868750456734930753033999".to_string(), "10284862272179454279380723177303354589165265724768792869172425850641532396958".to_string()],
+            b: vec![vec!["20094085308485991030092338753416508135313449543456147939097124612984047201335".to_string(), "11269943315518713067124801671029240901063146909738584854987772776806315890545".to_string()], vec!["5111528818556913201486596055325815760919897402988418362773344272232635103877".to_string(), "8122139689435793554974799663854817979475528090524378333920791336987132768041".to_string()]],
+            c: vec!["6410073677012431469384941862462268198904303371106734783574715889381934207004".to_string(), "11977981471972649035068934866969447415783144961145315609294880087827694234248".to_string()],
         };
 
         let update = LightClientStep {
-            finalized_slot: Uint256::from(0u64),
-            participation: Uint256::from(0u64),
-            finalized_header_root: vec![0; 32],
-            execution_state_root: vec![0; 32],
+            finalized_slot: Uint256::from(4359840u64),
+            participation: Uint256::from(432u64),
+            finalized_header_root: hex::decode("70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653").unwrap(),
+            execution_state_root: hex::decode("69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58").unwrap(),
             proof: proof
         };
-
+        println!("{:?}", update);
         let msg = ExecuteMsg::Step {update: update};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        println!("{:?}", _res);
+        // let value: Get = from_binary(&res).unwrap();
 
         // should complete a step
 
-        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        // let res = execute(deps.as_ref(), mock_env(), ExecuteMsg::Step {update}).unwrap();
         // let value: GetCountResponse = from_binary(&res).unwrap();
         // assert_eq!(18, value.count);
     }

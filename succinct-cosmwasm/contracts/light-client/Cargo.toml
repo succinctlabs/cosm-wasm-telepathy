@@ -51,6 +51,7 @@ cosmwasm-storage = "1.1.2"
 cw-storage-plus = "0.13.2"
 cw2 = "0.13.2"
 eth2_ssz = "0.4.0"
+hex = "0.4.3"
 log = "0.4.17"
 schemars = "0.8.8"
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }

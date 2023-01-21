@@ -16,12 +16,12 @@ use ark_groth16::Proof;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub genesis_validators_root: [u8; 32],
+    pub genesis_validators_root: Vec<u8>,
     pub genesis_time: Uint256,
     pub seconds_per_slot: Uint256,
     pub slots_per_period: Uint256,
     pub sync_committee_period: Uint256,
-    pub sync_committee_poseidon: [u8; 32],
+    pub sync_committee_poseidon: Vec<u8>,
 }
 
 #[cw_serde]

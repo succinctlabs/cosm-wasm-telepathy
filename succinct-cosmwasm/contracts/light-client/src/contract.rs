@@ -348,7 +348,7 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      * match, the contract is marked as inconsistent. Otherwise, we store the
      * root and emit an event.
      */
-fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32]) -> Result<(), ContractError> {
+fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
     let mut state = CONFIG.load(deps.storage)?;
 
     let key = period.to_string();
@@ -369,7 +369,7 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: [u8; 32
     /*
      * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
      */
-fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
+fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
     let mut state = CONFIG.load(deps.storage)?;
 
     let key = slot.to_string();
@@ -393,7 +393,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), Contract
      * @dev Update execution root as long as it is consistent with the current head or 
      * it is the execution root for the slot.
      */
-fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: [u8; 32]) -> Result<(), ContractError> {
+fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
     let mut state = CONFIG.load(deps.storage)?;
 
     let key = slot.to_string();
@@ -433,12 +433,12 @@ mod tests {
 
         // TODO: Update default msg with values from Gnosis
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: vec![0; 32],
             genesis_time: Uint256::from(0u64),
             seconds_per_slot: Uint256::from(0u64),
             slots_per_period: Uint256::from(0u64),
             sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: vec![0; 32], 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -457,12 +457,12 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: "043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb".as_bytes().to_vec(),
             genesis_time: Uint256::from(0u64),
             seconds_per_slot: Uint256::from(0u64),
             slots_per_period: Uint256::from(0u64),
             sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: "7032059424740925146199071046477651269705772793323287102921912953216115444414".as_bytes().to_vec(), 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -481,8 +481,8 @@ mod tests {
         let update = LightClientStep {
             finalized_slot: Uint256::from(0u64),
             participation: Uint256::from(0u64),
-            finalized_header_root: [0; 32],
-            execution_state_root: [0; 32],
+            finalized_header_root: vec![0; 32],
+            execution_state_root: vec![0; 32],
             proof: proof
         };
 
@@ -501,12 +501,12 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: vec![0; 32],
             genesis_time: Uint256::from(0u64),
             seconds_per_slot: Uint256::from(0u64),
             slots_per_period: Uint256::from(0u64),
             sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: vec![0; 32], 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -525,8 +525,8 @@ mod tests {
         let step = LightClientStep {
             finalized_slot: Uint256::from(0u64),
             participation: Uint256::from(0u64),
-            finalized_header_root: [0; 32],
-            execution_state_root: [0; 32],
+            finalized_header_root: vec![0; 32],
+            execution_state_root: vec![0; 32],
             proof: proof
         };
 
@@ -538,8 +538,8 @@ mod tests {
 
         let update: LightClientRotate = LightClientRotate {
             step: step,
-            sync_committee_ssz: [0; 32],
-            sync_committee_poseidon: [0; 32],
+            sync_committee_ssz: vec![0; 32],
+            sync_committee_poseidon: vec![0; 32],
             proof: sszProof, 
         };
 
@@ -558,12 +558,12 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: vec![0; 32],
             genesis_time: Uint256::from(0u64),
             seconds_per_slot: Uint256::from(0u64),
             slots_per_period: Uint256::from(0u64),
             sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: vec![0; 32], 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 

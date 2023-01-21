@@ -60,7 +60,7 @@ pub fn instantiate(
     // Set sync committee poseidon
     // TODO: Propogate error up
     let _response = set_sync_committee_poseidon(deps.branch(), msg.sync_committee_period, msg.sync_committee_poseidon);
-
+    println!("Set sync committee poseidon");
 
     CONFIG.save(deps.storage, &config)?;
 
@@ -95,9 +95,9 @@ pub mod execute {
      *   3) A valid execution state root proof
      */
     pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
-
+        println!("Start step");
         let finalized = process_step(deps.as_ref(), update.clone())?;
-        
+        println!("Finalized: {}", finalized);
         if finalized == false {
             println!("TODO: Handle invalid proof case properly");
             return Err(ContractError::InvalidProof {  });
@@ -206,6 +206,8 @@ pub mod query {
 
 fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = CONFIG.load(deps.storage)?;
+    // println!("Slot: {}", slot);
+    // println!("Slots per period: {}", state.slots_per_period);
     Ok(slot / state.slots_per_period)
 }
 
@@ -228,10 +230,12 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     // Get current period
     let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
 
+    println!("Current Period: {}", current_period);
     // Load poseidon for period
-    let sync_committee_poseidon = sync_committee_poseidons.load(deps.storage, current_period.to_string())?;
+    let sync_committee_poseidon = sync_committee_poseidons.may_load(deps.storage, current_period.to_string()).unwrap_or_default();
+    println!("Sync Committee Poseidon: {:?}", sync_committee_poseidon);
 
-    if sync_committee_poseidon == [0; 32] {
+    if sync_committee_poseidon.is_none()  {
         return Err(ContractError::SyncCommitteeNotInitialized {  });
     } else if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
@@ -350,7 +354,10 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      * root and emit an event.
      */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
+    println!("period inside of set_sync: {:?}", period);
     let mut state = CONFIG.load(deps.storage)?;
+    println!("Wtf");
+    println!("period inside of set_sync: {:?}", period);
 
     let key = period.to_string();
     let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key.clone())?.unwrap_or_default();
@@ -359,7 +366,6 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
         state.consistent = false;
         return Ok(())
     }
-
     sync_committee_poseidons.save(deps.storage, key.clone(), &poseidon)?;
 
     // TODO: Emit event
@@ -459,10 +465,10 @@ mod tests {
 
         let msg = InstantiateMsg { 
             genesis_validators_root: hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap(),
-            genesis_time: Uint256::from(0u64),
-            seconds_per_slot: Uint256::from(0u64),
-            slots_per_period: Uint256::from(0u64),
-            sync_committee_period: Uint256::from(0u64),
+            genesis_time: Uint256::from(1616508000u64),
+            seconds_per_slot: Uint256::from(12u64),
+            slots_per_period: Uint256::from(8192u64),
+            sync_committee_period: Uint256::from(532u64),
             sync_committee_poseidon: Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes().to_vec(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));

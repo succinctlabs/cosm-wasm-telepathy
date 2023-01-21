@@ -1,4 +1,5 @@
-use std::str::FromStr;
+use std::default;
+use std::str::{FromStr, from_utf8};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -9,8 +10,9 @@ use sha2::{Digest, Sha256};
 // use byteorder::{LittleEndian, WriteBytesExt};
 
 use ssz::{Decode, Encode};
+use crate::verifier::Verifier;
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, CircomProof, PublicSignals};
 use crate::state::{Config, Groth16Proof, BeaconBlockHeader, LightClientStep, LightClientRotate, CONFIG, headers, execution_state_roots, sync_committee_poseidons, best_updates};
 
 
@@ -94,6 +96,11 @@ pub mod execute {
     pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
 
         let finalized = process_step(deps.as_ref(), update.clone())?;
+        
+        if finalized == false {
+            println!("TODO: Handle invalid proof case properly");
+            return Err(ContractError::InvalidProof {  });
+        }
 
         let current_slot = get_current_slot(_env, deps.as_ref())?;
         if current_slot < update.finalized_slot {
@@ -281,13 +288,33 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     for i in 0..32 {
         t[i] = t[i] & h[i];
     }
-    // call verifyProofStep
-    let proof = update.clone().proof;
-    let inputs = vec![t];
-    // TODO: Figure out how to use arkworks from wasm and vkey file
+    // TODO: Remove Groth16Proof struct?
+    let groth16Proof = update.clone().proof;
 
+    // Set proof
+    let inputs = vec![t];
+    let inputsString = from_utf8(&inputs[0]).unwrap();
+
+    // Init verifier
+    let verifier = Verifier::new();
+
+    let mut circomProof = CircomProof::default();
+    circomProof.pi_a = groth16Proof.a;
+    circomProof.pi_b = groth16Proof.b;
+    circomProof.pi_c = groth16Proof.c;
+    circomProof.protocol = "groth16".to_string();
+    circomProof.curve = "bn128".to_string();
+    let proof = circomProof.to_proof();
+
+    let publicSignals = PublicSignals::from_values(inputsString.to_string());
+
+    let result = verifier.verify_proof(proof, &publicSignals.get());
+    if result == false {
+        return Err(ContractError::InvalidProof { });
+    }
 
     Ok(())
+
 }
 
 // TODO: Implement Logic
@@ -446,9 +473,9 @@ mod tests {
         let info = mock_info("anyone", &coins(2, "token"));
 
         let proof = Groth16Proof {
-            a: [Uint256::from(0u64); 2],
-            b: [[Uint256::from(0u64); 2]; 2],
-            c: [Uint256::from(0u64); 2],
+            a: vec!["0".to_string(), "0".to_string()],
+            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
+            c: vec!["0".to_string(), "0".to_string()],
         };
 
         let update = LightClientStep {
@@ -490,9 +517,9 @@ mod tests {
         let info = mock_info("anyone", &coins(2, "token"));
 
         let proof = Groth16Proof {
-            a: [Uint256::from(0u64); 2],
-            b: [[Uint256::from(0u64); 2]; 2],
-            c: [Uint256::from(0u64); 2],
+            a: vec!["0".to_string(), "0".to_string()],
+            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
+            c: vec!["0".to_string(), "0".to_string()],
         };
 
         let step = LightClientStep {
@@ -504,9 +531,9 @@ mod tests {
         };
 
         let sszProof = Groth16Proof {
-            a: [Uint256::from(0u64); 2],
-            b: [[Uint256::from(0u64); 2]; 2],
-            c: [Uint256::from(0u64); 2],
+            a: vec!["0".to_string(), "0".to_string()],
+            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
+            c: vec!["0".to_string(), "0".to_string()],
         };
 
         let update: LightClientRotate = LightClientRotate {

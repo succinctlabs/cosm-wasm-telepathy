@@ -30,6 +30,9 @@ pub enum ContractError {
     #[error("Must wait for current sync committee period to end.")]
     CurrentSyncCommitteeNotEnded {},
 
+    #[error("Proof failed to verify.")]
+    InvalidProof {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
     // Add any other custom errors you like here.

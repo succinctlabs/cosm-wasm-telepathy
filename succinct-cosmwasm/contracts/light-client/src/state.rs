@@ -21,9 +21,9 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Groth16Proof {
-    pub a: [Uint256; 2],
-    pub b: [[Uint256; 2]; 2],
-    pub c: [Uint256; 2],
+    pub a: Vec<String>,
+    pub b: Vec<Vec<String>>,
+    pub c: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

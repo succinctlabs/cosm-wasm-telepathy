@@ -59,24 +59,16 @@ pub struct GetCurrentSlotResponse {
 pub struct PublicSignals(pub Vec<String>);
 
 // Public signals from circom
-// public [root, nullifierHash, recipient, relayer, fee]
+// public [combinedHash]
 impl PublicSignals {
     pub fn from(public_signals: Vec<String>) -> Self {
         PublicSignals(public_signals)
     }
     pub fn from_values(
-        root: String,
-        nullifier_hash: String,
-        recipient: String,
-        relayer: String,
-        fee: Uint128,
+        combinedHash: String
     ) -> Self {
         let mut signals: Vec<String> = Vec::new();
-        signals.push(root);
-        signals.push(nullifier_hash);
-        signals.push(PublicSignals::bech32_to_u256(recipient));
-        signals.push(PublicSignals::bech32_to_u256(relayer));
-        signals.push(fee.to_string());
+        signals.push(combinedHash);
 
         PublicSignals(signals)
     }
@@ -119,6 +111,15 @@ pub struct CircomProof {
 }
 
 impl CircomProof {
+    pub fn default() -> Self {
+        CircomProof {
+            pi_a: vec!["0".to_string(), "0".to_string()],
+            pi_b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
+            pi_c: vec!["0".to_string(), "0".to_string()],
+            protocol: "groth16".to_string(),
+            curve: "bn254".to_string(),
+        }
+    }
     pub fn from(json_str: String) -> Self {
         println!("json_str: {}", json_str);
         let unwrapped_json: CircomProof = serde_json::from_str(&json_str).expect("JSON was not well-formatted");

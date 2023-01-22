@@ -271,7 +271,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     let mut temp = [0u8; 64];
     // sha256 & combine inputs
     temp[..32].copy_from_slice(&finalizedSlotLE);
-    temp[32..].copy_from_slice(&participationLE);
+    temp[32..].copy_from_slice(&update.finalized_header_root);
     h.copy_from_slice(&Sha256::digest(&temp));
 
     temp[..32].copy_from_slice(&h);
@@ -319,8 +319,8 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     println!("Circom Proof: {:?}", circomProof);
     let proof = circomProof.to_proof();
 
-    let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
-    // let publicSignals = PublicSignals::from_values(inputsString);
+    // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
+    let publicSignals = PublicSignals::from_values(inputsString);
 
     println!("Proof: {:?}", proof);
     println!("Public Signals: {:?}", publicSignals);

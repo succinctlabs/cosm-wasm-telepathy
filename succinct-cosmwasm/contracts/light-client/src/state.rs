@@ -6,7 +6,7 @@ use cosmwasm_std::{Addr, Uint256};
 use cw_storage_plus::{Item,Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct Config {
+pub struct State {
     // TODO: Fix with Uint256 (not sure if hash fn supported)
 
     pub consistent: bool,
@@ -58,4 +58,4 @@ pub const execution_state_roots: Map<String, Vec<u8>> = Map::new("execution_stat
 pub const sync_committee_poseidons: Map<String, Vec<u8>> = Map::new("sync_committee_poseidons");
 pub const best_updates: Map<String, LightClientRotate> = Map::new("best_updates");
 
-pub const CONFIG: Item<Config> = Item::new("config");
+pub const STATE: Item<State> = Item::new("state");

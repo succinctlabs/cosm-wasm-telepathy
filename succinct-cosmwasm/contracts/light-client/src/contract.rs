@@ -14,7 +14,7 @@ use ssz::{Decode, Encode};
 use crate::verifier::Verifier;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, CircomProof, PublicSignals};
-use crate::state::{Config, Groth16Proof, BeaconBlockHeader, LightClientStep, LightClientRotate, CONFIG, headers, execution_state_roots, sync_committee_poseidons, best_updates};
+use crate::state::{STATE, State, Groth16Proof, BeaconBlockHeader, LightClientStep, LightClientRotate, headers, execution_state_roots, sync_committee_poseidons, best_updates};
 
 
 // version info for migration info
@@ -46,7 +46,7 @@ pub fn instantiate(
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config: Config = Config {
+    let state: State = State {
         genesis_validators_root: msg.genesis_validators_root,
         genesis_time: msg.genesis_time,
         seconds_per_slot: msg.seconds_per_slot,
@@ -57,12 +57,13 @@ pub fn instantiate(
 
 
     };
+    STATE.save(deps.storage, &state)?;
     // Set sync committee poseidon
     // TODO: Propogate error up
     let _response = set_sync_committee_poseidon(deps.branch(), msg.sync_committee_period, msg.sync_committee_poseidon);
-    println!("Set sync committee poseidon");
 
-    CONFIG.save(deps.storage, &config)?;
+    println!("Set sync committee poseidon {:?}", _response);
+
 
     // TOOD: Update response string
     Ok(Response::new()
@@ -158,7 +159,10 @@ pub mod execute {
         let update = best_updates.load(deps.storage, period.to_string())?;
         let next_period = period + Uint256::from(1u64);
 
-        let next_sync_committee_poseidon = sync_committee_poseidons.may_load(deps.storage, next_period.to_string())?.unwrap_or_default();
+        let next_sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, next_period.to_string())?{
+            Some(poseidon) => poseidon,
+            None => vec![0; 32],
+        };
         let slot = get_current_slot(_env, deps.as_ref())?;
 
         if update.step.finalized_header_root == [0; 32] {
@@ -205,14 +209,14 @@ pub mod query {
 // View functions
 
 fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
-    let state = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     // println!("Slot: {}", slot);
     // println!("Slots per period: {}", state.slots_per_period);
     Ok(slot / state.slots_per_period)
 }
 
 fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
-    let state = CONFIG.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let block = _env.block;
     let timestamp = Uint256::from(block.time.seconds());
     // TODO: Confirm this is timestamp in CosmWasm
@@ -232,12 +236,13 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
 
     println!("Current Period: {}", current_period);
     // Load poseidon for period
-    let sync_committee_poseidon = sync_committee_poseidons.may_load(deps.storage, current_period.to_string()).unwrap_or_default();
+    let sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, current_period.to_string())? {
+        Some(poseidon) => Some(poseidon),
+        None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
+    };
     println!("Sync Committee Poseidon: {:?}", sync_committee_poseidon);
 
-    if sync_committee_poseidon.is_none()  {
-        return Err(ContractError::SyncCommitteeNotInitialized {  });
-    } else if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+    if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
     }
 
@@ -355,14 +360,17 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
     println!("period inside of set_sync: {:?}", period);
-    let mut state = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
     println!("Wtf");
     println!("period inside of set_sync: {:?}", period);
 
     let key = period.to_string();
-    let poseidonForPeriod = sync_committee_poseidons.may_load(deps.storage, key.clone())?.unwrap_or_default();
-    // If sync committee does not exist    
+    let poseidonForPeriod = match sync_committee_poseidons.may_load(deps.storage, key.clone())?{
+        Some(poseidon) => poseidon,
+        None => vec![0; 32],
+    };   
     if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
+        println!("poseidonForPeriod: {:?}", poseidonForPeriod);
         state.consistent = false;
         return Ok(())
     }
@@ -377,11 +385,14 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
      * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
      */
 fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
-    let mut state = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
 
     let key = slot.to_string();
 
-    let rootForSlot = headers.may_load(deps.storage, key.clone())?.unwrap_or_default();
+    let rootForSlot = match headers.may_load(deps.storage, key.clone())?{
+        Some(root) => root,
+        None => vec![0; 32],
+    };
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;
@@ -401,11 +412,14 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
      * it is the execution root for the slot.
      */
 fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
-    let mut state = CONFIG.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
 
     let key = slot.to_string();
 
-    let rootForSlot = execution_state_roots.may_load(deps.storage, key.clone())?.unwrap_or_default();
+    let rootForSlot = match execution_state_roots.may_load(deps.storage, key.clone())?{
+        Some(root) => root,
+        None => vec![0; 32],
+    };
     // If sync committee does not exist    
     if rootForSlot != [0; 32] && rootForSlot != root {
         state.consistent = false;

@@ -62,7 +62,7 @@ pub fn instantiate(
     // TODO: Propogate error up
     let _response = set_sync_committee_poseidon(deps.branch(), msg.sync_committee_period, msg.sync_committee_poseidon);
 
-    println!("Set sync committee poseidon {:?}", _response);
+    // println!("Set sync committee poseidon {:?}", _response);
 
 
     // TOOD: Update response string
@@ -97,19 +97,15 @@ pub mod execute {
      */
     pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
         println!("Start step");
-        let finalized = process_step(deps.as_ref(), update.clone())?;
-        println!("Finalized: {}", finalized);
-        if finalized == false {
-            println!("TODO: Handle invalid proof case properly");
-            return Err(ContractError::InvalidProof {  });
-        }
+        let finalized = process_step(deps.as_ref(), update.clone());
+        // println!("Finalized: {}", &finalized?);
 
         let current_slot = get_current_slot(_env, deps.as_ref())?;
         if current_slot < update.finalized_slot {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
-        if finalized {
+        if finalized.unwrap() {
             set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
             set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
         }
@@ -247,7 +243,11 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     }
 
     // TODO: Ensure zk_light_client_step is complete
-    zk_light_client_step(deps, update.clone());
+    let result = zk_light_client_step(deps, update.clone());
+    if result.is_err() {
+        println!("Proof failed!");
+        return Err(result.err().unwrap());
+    }
     
     let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
     return Ok(bool);
@@ -302,8 +302,10 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     let groth16Proof = update.clone().proof;
 
     // Set proof
-    let inputs = vec![t];
-    let inputsString = from_utf8(&inputs[0]).unwrap();
+    let inputs = &t;
+    println!("Inputs: {:?}", &inputs);
+    let inputsString = Uint256::from_le_bytes(t).to_string();
+    // let inputsArray = vec![inputsString.clone()];
 
     // Init verifier
     let verifier = Verifier::new();
@@ -314,11 +316,16 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     circomProof.pi_c = groth16Proof.c;
     circomProof.protocol = "groth16".to_string();
     circomProof.curve = "bn128".to_string();
+    println!("Circom Proof: {:?}", circomProof);
     let proof = circomProof.to_proof();
 
-    let publicSignals = PublicSignals::from_values(inputsString.to_string());
+    let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
+    // let publicSignals = PublicSignals::from_values(inputsString);
 
+    println!("Proof: {:?}", proof);
+    println!("Public Signals: {:?}", publicSignals);
     let result = verifier.verify_proof(proof, &publicSignals.get());
+    println!("Result: {:?}", result);
     if result == false {
         return Err(ContractError::InvalidProof { });
     }
@@ -359,9 +366,7 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      * root and emit an event.
      */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
-    println!("period inside of set_sync: {:?}", period);
     let mut state = STATE.load(deps.storage)?;
-    println!("Wtf");
     println!("period inside of set_sync: {:?}", period);
 
     let key = period.to_string();
@@ -370,7 +375,6 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
         None => vec![0; 32],
     };   
     if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
-        println!("poseidonForPeriod: {:?}", poseidonForPeriod);
         state.consistent = false;
         return Ok(())
     }
@@ -494,9 +498,9 @@ mod tests {
         let info = mock_info("anyone", &coins(2, "token"));
 
         let proof = Groth16Proof {
-            a: vec!["14717729948616455402271823418418032272798439132063966868750456734930753033999".to_string(), "10284862272179454279380723177303354589165265724768792869172425850641532396958".to_string()],
-            b: vec![vec!["20094085308485991030092338753416508135313449543456147939097124612984047201335".to_string(), "11269943315518713067124801671029240901063146909738584854987772776806315890545".to_string()], vec!["5111528818556913201486596055325815760919897402988418362773344272232635103877".to_string(), "8122139689435793554974799663854817979475528090524378333920791336987132768041".to_string()]],
-            c: vec!["6410073677012431469384941862462268198904303371106734783574715889381934207004".to_string(), "11977981471972649035068934866969447415783144961145315609294880087827694234248".to_string()],
+            a: vec!["19052226342225059169368468943242899722463738230905472208500084961135663160509".to_string(), "16380864488893534373718997305335489269591160449720961122684967788310493516960".to_string()],
+            b: vec![vec!["2406202055061937495864025448062673105573298015762558145337278147528693758087".to_string(), "4244962819146553706141100213693629757064153729737155348694001350554073199025".to_string()], vec!["4919212484791842246061291319810230307273866158940801673938573541010074937108".to_string(), "19863879735005091764507944581578827016309554400620309321981302697664139308420".to_string()]],
+            c: vec!["1829551706225848956019079207808894803390573677937562262492010544721230274603".to_string(), "13268182403423635285587955224347309783477597315739288159906876579157053326067".to_string()],
         };
 
         let update = LightClientStep {

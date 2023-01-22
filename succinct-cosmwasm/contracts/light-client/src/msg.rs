@@ -128,7 +128,7 @@ impl CircomProof {
     }
 
     pub fn to_proof(self) -> Proof<Bn254> {
-        println!("pi_a: {:?}", self.pi_a);
+        // println!("pi_a: {:?}", self.pi_a);
         let a = G1Affine::new(
             Fp256::from_str(&self.pi_a[0]).unwrap(),
             Fp256::from_str(&self.pi_a[1]).unwrap(),

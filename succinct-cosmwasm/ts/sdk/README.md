@@ -1,1 +1,0 @@
-# succinct-cosmwasm-sdk

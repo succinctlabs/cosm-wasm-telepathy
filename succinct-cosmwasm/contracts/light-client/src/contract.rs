@@ -168,16 +168,14 @@ pub mod execute {
         let update = best_updates.load(deps.storage, period.to_string())?;
         let next_period = period + Uint256::from(1u64);
 
-        let next_sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, next_period.to_string())?{
+        let _next_sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, next_period.to_string())?{
             Some(poseidon) => poseidon,
-            None => vec![0; 32],
+            None => return Err(ContractError::SyncCommitteeAlreadyInitialized {}),
         };
         let slot = get_current_slot(_env, deps.as_ref())?;
 
         if update.step.finalized_header_root == vec![0; 32] {
             return Err(ContractError::BestUpdateNotInitialized {});
-        } else if next_sync_committee_poseidon != vec![0; 32] {
-            return Err(ContractError::SyncCommitteeAlreadyInitialized {});
         } else if get_sync_committee_period(slot, deps.as_ref())? < next_period {
             return Err(ContractError::CurrentSyncCommitteeNotEnded {});
         }
@@ -445,8 +443,6 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
      */
 fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
     let mut state = STATE.load(deps.storage)?;
-
-    let key = slot.to_string();
 
     let root_for_slot = match execution_state_roots.may_load(deps.storage, slot.to_string())?{
         Some(root) => root,

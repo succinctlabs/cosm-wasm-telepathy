@@ -127,7 +127,11 @@ pub mod execute {
         let next_period = current_period + Uint256::from(1u64);
 
         //TODO: Finalize zk_light_client_rotate
-        zk_light_client_rotate(deps.as_ref(), update.clone());
+        let result = zk_light_client_rotate(deps.as_ref(), update.clone());
+        if result.is_err() {
+            println!("Proof failed!");
+            return Err(result.err().unwrap());
+        }
 
         if finalized {
             set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
@@ -296,7 +300,6 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     let groth16Proof = update.clone().proof;
 
     // Set proof
-    let inputs = &t;
     let inputsString = Uint256::from_le_bytes(t).to_string();
 
     // Init verifier
@@ -316,7 +319,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     let result = verifier.verify_proof(proof, &publicSignals.get());
     println!("Result: {:?}", result);
     if result == false {
-        return Err(ContractError::InvalidProof { });
+        return Err(ContractError::InvalidStepProof { });
     }
 
     Ok(())
@@ -328,22 +331,50 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     * @dev Proof logic for rotate!
     */
 fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), ContractError> {
-    let proof = update.clone().proof;
 
-    let inputs = [Uint256::from(0u64); 65];
+    let mut inputs = vec!["0".to_string(); 65];
 
-    // Convert finalizedSlot, participation to little endian with ssz
+    // Set up inputs correctly
+    let syncCommitteeSSZNumeric = Uint256::from_le_bytes(vec_to_bytes(update.clone().sync_committee_ssz));
+    let syncCommitteeSSZNumericBE = syncCommitteeSSZNumeric.to_be_bytes();
+    for i in 0..32 {
+        inputs[31-i] = syncCommitteeSSZNumericBE[i].to_string();
+    }
 
-    // getSyncCommitteePeriod & syncCommitteePoseidon
+    let finalizedHeaderRootNumeric = Uint256::from_le_bytes(vec_to_bytes(update.clone().step.finalized_header_root));
+    let finalizedHeaderRootNumericBE = finalizedHeaderRootNumeric.to_be_bytes();
+    for i in 0..32 {
+        inputs[63-i] = finalizedHeaderRootNumericBE[i].to_string();
+    }
 
+    inputs[64] = Uint256::from_le_bytes(vec_to_bytes(update.clone().sync_committee_poseidon)).to_string();
 
-    // sha256 & combine inputs
+    let groth16Proof = update.clone().proof;
+    let verifier = Verifier::new_rotate_verifier();
 
-    // call verifyProofStep
-    // TODO: Figure out how to use arkworks from wasm and vkey file
+    let mut circomProof = CircomProof::default();
+    circomProof.pi_a = groth16Proof.a;
+    circomProof.pi_b = groth16Proof.b;
+    circomProof.pi_c = groth16Proof.c;
+    circomProof.protocol = "groth16".to_string();
+    circomProof.curve = "bn128".to_string();
+    let proof = circomProof.to_proof();
+    // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
+    let publicSignals = PublicSignals::from(inputs);
 
-
+    println!("Public Signals: {:?}", publicSignals);
+    let result = verifier.verify_proof(proof, &publicSignals.get());
+    println!("Result: {:?}", result);
+    if result == false {
+        return Err(ContractError::InvalidRotateProof { });
+    }
     Ok(())
+}
+
+fn vec_to_bytes(vec: Vec<u8>) -> [u8; 32] {
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(&vec);
+    return bytes;
 }
 
 // State interaction functions

@@ -62,7 +62,6 @@ pub fn instantiate(
     // TODO: Propogate error up
     let _response = set_sync_committee_poseidon(deps.branch(), msg.sync_committee_period, msg.sync_committee_poseidon);
 
-    // println!("Set sync committee poseidon {:?}", _response);
 
 
     // TOOD: Update response string
@@ -98,7 +97,6 @@ pub mod execute {
     pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
         println!("Start step");
         let finalized = process_step(deps.as_ref(), update.clone());
-        // println!("Finalized: {}", &finalized?);
 
         let current_slot = get_current_slot(_env, deps.as_ref())?;
         if current_slot < update.finalized_slot {
@@ -206,8 +204,6 @@ pub mod query {
 
 fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = STATE.load(deps.storage)?;
-    // println!("Slot: {}", slot);
-    // println!("Slots per period: {}", state.slots_per_period);
     Ok(slot / state.slots_per_period)
 }
 
@@ -230,13 +226,11 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     // Get current period
     let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
 
-    println!("Current Period: {}", current_period);
     // Load poseidon for period
     let sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, current_period.to_string())? {
         Some(poseidon) => Some(poseidon),
         None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
     };
-    // println!("Sync Committee Poseidon: {:?}", sync_committee_poseidon);
 
     if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
@@ -303,9 +297,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
 
     // Set proof
     let inputs = &t;
-    // println!("Inputs: {:?}", &inputs);
     let inputsString = Uint256::from_le_bytes(t).to_string();
-    // let inputsArray = vec![inputsString.clone()];
 
     // Init verifier
     let verifier = Verifier::new_step_verifier();
@@ -316,13 +308,10 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     circomProof.pi_c = groth16Proof.c;
     circomProof.protocol = "groth16".to_string();
     circomProof.curve = "bn128".to_string();
-    // println!("Circom Proof: {:?}", circomProof);
     let proof = circomProof.to_proof();
-    println!("Proof: {:?}", proof);
     // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
     let publicSignals = PublicSignals::from_values(inputsString);
 
-    // println!("Proof: {:?}", proof);
     println!("Public Signals: {:?}", publicSignals);
     let result = verifier.verify_proof(proof, &publicSignals.get());
     println!("Result: {:?}", result);
@@ -367,7 +356,6 @@ fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), C
      */
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
     let mut state = STATE.load(deps.storage)?;
-    println!("period inside of set_sync: {:?}", period);
 
     let key = period.to_string();
     let poseidonForPeriod = match sync_committee_poseidons.may_load(deps.storage, key.clone())?{
@@ -512,8 +500,6 @@ mod tests {
             proof: proof
         };
         println!("{:?}", update);
-        // println!("{:?}", hex::encode(update.finalized_header_root.clone()));
-        // println!("{:?}", hex::encode(update.execution_state_root.clone()));
 
         let msg = ExecuteMsg::Step {update: update};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();

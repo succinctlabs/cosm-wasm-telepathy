@@ -5,6 +5,7 @@ import "./StepVerifier.sol";
 import "./RotateVerifier.sol";
 import "./libraries/SimpleSerialize.sol";
 import "./interfaces/ILightClient.sol";
+import "forge-std/console.sol";
 
 struct Groth16Proof {
     uint256[2] a;
@@ -145,19 +146,49 @@ contract LightClient is ILightClient, StepVerifier, RotateVerifier {
 
     function zkLightClientStep(LightClientStep memory update) internal view {
         bytes32 finalizedSlotLE = SSZ.toLittleEndian(update.finalizedSlot);
+        // console.logBytes32(finalizedSlotLE);
+        // console.log("Finalized Slot LE: %s", finalizedSlotLE);
         bytes32 participationLE = SSZ.toLittleEndian(update.participation);
-        uint256 currentPeriod = getSyncCommitteePeriod(update.finalizedSlot);
-        bytes32 syncCommitteePoseidon = syncCommitteePoseidons[currentPeriod];
+        // console.logBytes32(participationLE);
 
+        // console.log("Finalized Slot LE: %s", participationLE);
+        uint256 currentPeriod = getSyncCommitteePeriod(update.finalizedSlot);
+        // console.logUint(currentPeriod);
+        // console.log("Current Period: %s", currentPeriod);
+
+        bytes32 syncCommitteePoseidon = syncCommitteePoseidons[currentPeriod];
+        // console.logBytes32(syncCommitteePoseidon);
+        // console.log("Current Period: %s", syncCommitteePoseidon);
+
+        // console.log("H Time");
         bytes32 h;
         h = sha256(bytes.concat(finalizedSlotLE, update.finalizedHeaderRoot));
+        // console.logBytes32(h);
         h = sha256(bytes.concat(h, participationLE));
+        // console.logBytes32(h);
         h = sha256(bytes.concat(h, update.executionStateRoot));
+        // console.logBytes32(h);
         h = sha256(bytes.concat(h, syncCommitteePoseidon));
+        // console.logBytes32(h);
         uint256 t = uint256(SSZ.toLittleEndian(uint256(h)));
+        // console.log("Now it's T");
+        // console.logUint(t);
         t = t & ((uint256(1) << 253) - 1);
+        // console.logUint(t);
 
         Groth16Proof memory proof = update.proof;
+        // console.log("Proof");
+        // console.logUint(proof.a[0]);
+        // console.logUint(proof.a[1]);
+
+        // console.logUint(proof.b[0][0]);
+        // console.logUint(proof.b[0][1]);
+        // console.logUint(proof.b[1][0]);
+        // console.logUint(proof.b[1][1]);
+        // console.logUint(proof.c[0]);
+        // console.logUint(proof.c[1]);
+
+
         uint256[1] memory inputs = [uint256(t)];
         require(verifyProofStep(proof.a, proof.b, proof.c, inputs) == true);
     }
@@ -166,6 +197,7 @@ contract LightClient is ILightClient, StepVerifier, RotateVerifier {
         Groth16Proof memory proof = update.proof;
         uint256[65] memory inputs;
 
+// TODO: Check if this is big endian
         uint256 syncCommitteeSSZNumeric = uint256(update.syncCommitteeSSZ);
         for (uint256 i = 0; i < 32; i++) {
             inputs[32 - 1 - i] = syncCommitteeSSZNumeric % 2 ** 8;

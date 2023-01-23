@@ -58,7 +58,7 @@ contract LightClientTest is Test {
         require(SSZ.isValidMerkleBranch(leaf, index, branch, root) == true);
     }
 
-    function testProof() public {
+    function testRatanProof() public {
         uint256[2] memory a = [
             19052226342225059169368468943242899722463738230905472208500084961135663160509,
             16380864488893534373718997305335489269591160449720961122684967788310493516960
@@ -101,7 +101,7 @@ contract LightClientTest is Test {
         console.logUint(uint256(h) & (uint256(1 << 253) - 1));
     }
 
-    function testStep() public {
+    function testRatanStep() public {
         uint256 finalizedSlot = 4359840;
         uint256 participation = 432;
         bytes32 finalizedHeaderRoot = bytes32(0x70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653);

@@ -12,6 +12,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.14;
+import "forge-std/console.sol";
+
 
 library PairingStep {
     struct G1Point {
@@ -297,6 +299,20 @@ contract StepVerifier {
         uint256[2] memory c,
         uint256[1] memory input
     ) public view returns (bool r) {
+        console.log("Step Proof");
+        console.logUint(a[0]);
+        console.logUint(a[1]);
+
+        console.logUint(b[0][0]);
+        console.logUint(b[0][1]);
+        console.logUint(b[1][0]);
+        console.logUint(b[1][1]);
+        console.logUint(c[0]);
+        console.logUint(c[1]);
+
+        console.log("input");
+        console.logUint(input[0]);
+
         ProofStep memory proof;
         proof.A = PairingStep.G1Point(a[0], a[1]);
         proof.B = PairingStep.G2Point([b[0][0], b[0][1]], [b[1][0], b[1][1]]);

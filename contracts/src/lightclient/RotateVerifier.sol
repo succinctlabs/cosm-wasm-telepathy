@@ -12,6 +12,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.14;
+import "forge-std/console.sol";
+
 
 library PairingRotate {
     struct G1Point {
@@ -554,11 +556,26 @@ contract RotateVerifier {
         uint256[65] memory input
     ) public view returns (bool r) {
         ProofRotate memory proof;
+        console.log("Rotate Proof");
+        console.logUint(a[0]);
+        console.logUint(a[1]);
+
+        console.logUint(b[0][0]);
+        console.logUint(b[0][1]);
+        console.logUint(b[1][0]);
+        console.logUint(b[1][1]);
+        console.logUint(c[0]);
+        console.logUint(c[1]);
+
+        
         proof.A = PairingRotate.G1Point(a[0], a[1]);
         proof.B = PairingRotate.G2Point([b[0][0], b[0][1]], [b[1][0], b[1][1]]);
         proof.C = PairingRotate.G1Point(c[0], c[1]);
         uint256[] memory inputValues = new uint[](input.length);
+        console.log("inputs");
+
         for (uint256 i = 0; i < input.length; i++) {
+            console.logUint(input[i]);
             inputValues[i] = input[i];
         }
         if (verifyRotate(inputValues, proof) == 0) {

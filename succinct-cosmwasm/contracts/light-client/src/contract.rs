@@ -104,8 +104,14 @@ pub mod execute {
         }
 
         if finalized.unwrap() {
-            set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
-            set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
+            let _res = set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
+            if _res.is_err() {
+                return Err(_res.err().unwrap())
+            }
+            let _res = set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
+            if _res.is_err() {
+                return Err(_res.err().unwrap())
+            }
         }
 
         // TODO: Add more specifics on response
@@ -127,18 +133,21 @@ pub mod execute {
         let next_period = current_period + Uint256::from(1u64);
 
         //TODO: Finalize zk_light_client_rotate
-        let result = zk_light_client_rotate(deps.as_ref(), update.clone());
+        let result = zk_light_client_rotate(update.clone());
         if result.is_err() {
             println!("Proof failed!");
             return Err(result.err().unwrap());
         }
 
         if finalized {
-            set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
+            let _res = set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
+            if _res.is_err() {
+                return Err(_res.err().unwrap())
+            }
         } else {
             // TODO: load is if definitely there, if not there, must do may load
             let best_update = best_updates.load(deps.storage, current_period.to_string())?;
-            if (step.participation < best_update.step.participation) {
+            if step.participation < best_update.step.participation {
                 return Err(ContractError::ExistsBetterUpdate {});
             }
             set_best_update(deps, current_period, update);
@@ -171,7 +180,10 @@ pub mod execute {
             return Err(ContractError::CurrentSyncCommitteeNotEnded {});
         }
 
-        set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
+        let _res = set_sync_committee_poseidon(deps, next_period, update.sync_committee_poseidon);
+        if _res.is_err() {
+            return Err(_res.err().unwrap());
+        }
 
         // TODO: Add more specifics on response
         Ok(Response::new().add_attribute("action", "force"))
@@ -231,7 +243,7 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
 
     // Load poseidon for period
-    let sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, current_period.to_string())? {
+    let _sync_committee_poseidon = match sync_committee_poseidons.may_load(deps.storage, current_period.to_string())? {
         Some(poseidon) => Some(poseidon),
         None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
     };
@@ -259,21 +271,21 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     */
 fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), ContractError> {
     // Set up initial bytes
-    let finalizedSlotLE = update.finalized_slot.to_le_bytes();
-    let participationLE = update.participation.to_le_bytes();
-    let currentPeriod = get_sync_committee_period(update.finalized_slot, deps)?;
-    let syncCommitteePoseidon = sync_committee_poseidons.load(deps.storage, currentPeriod.to_string())?;
+    let finalized_slot_le = update.finalized_slot.to_le_bytes();
+    let participation_le = update.participation.to_le_bytes();
+    let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
+    let sync_committee_poseidon = sync_committee_poseidons.load(deps.storage, current_period.to_string())?;
 
 
     let mut h = [0u8; 32];
     let mut temp = [0u8; 64];
     // sha256 & combine inputs
-    temp[..32].copy_from_slice(&finalizedSlotLE);
+    temp[..32].copy_from_slice(&finalized_slot_le);
     temp[32..].copy_from_slice(&update.finalized_header_root);
     h.copy_from_slice(&Sha256::digest(&temp));
 
     temp[..32].copy_from_slice(&h);
-    temp[32..].copy_from_slice(&participationLE);
+    temp[32..].copy_from_slice(&participation_le);
     h.copy_from_slice(&Sha256::digest(&temp));
 
     temp[..32].copy_from_slice(&h);
@@ -281,7 +293,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     h.copy_from_slice(&Sha256::digest(&temp));
 
     temp[..32].copy_from_slice(&h);
-    temp[32..].copy_from_slice(&syncCommitteePoseidon);
+    temp[32..].copy_from_slice(&sync_committee_poseidon);
     h.copy_from_slice(&Sha256::digest(&temp));
 
     // Make h little endian
@@ -297,26 +309,28 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
         t[i] = t[i] & h[i];
     }
     // TODO: Remove Groth16Proof struct?
-    let groth16Proof = update.clone().proof;
+    let groth_16_proof = update.clone().proof;
 
     // Set proof
-    let inputsString = Uint256::from_le_bytes(t).to_string();
+    let inputs_string = Uint256::from_le_bytes(t).to_string();
 
     // Init verifier
     let verifier = Verifier::new_step_verifier();
 
-    let mut circomProof = CircomProof::default();
-    circomProof.pi_a = groth16Proof.a;
-    circomProof.pi_b = groth16Proof.b;
-    circomProof.pi_c = groth16Proof.c;
-    circomProof.protocol = "groth16".to_string();
-    circomProof.curve = "bn128".to_string();
-    let proof = circomProof.to_proof();
+    let circom_proof = CircomProof {
+        pi_a: groth_16_proof.a,
+        pi_b: groth_16_proof.b,
+        pi_c: groth_16_proof.c,
+        protocol: "groth16".to_string(),
+        curve: "bn128".to_string(),
+    };
+    
+    let proof = circom_proof.to_proof();
     // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
-    let publicSignals = PublicSignals::from_values(inputsString);
+    let public_signals = PublicSignals::from_values(inputs_string);
 
-    println!("Public Signals: {:?}", publicSignals);
-    let result = verifier.verify_proof(proof, &publicSignals.get());
+    println!("Public Signals: {:?}", public_signals);
+    let result = verifier.verify_proof(proof, &public_signals.get());
     println!("Result: {:?}", result);
     if result == false {
         return Err(ContractError::InvalidStepProof { });
@@ -330,40 +344,43 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     /*
     * @dev Proof logic for rotate!
     */
-fn zk_light_client_rotate(deps: Deps, update: LightClientRotate) -> Result<(), ContractError> {
+fn zk_light_client_rotate(update: LightClientRotate) -> Result<(), ContractError> {
 
     let mut inputs = vec!["0".to_string(); 65];
 
     // Set up inputs correctly
-    let syncCommitteeSSZNumeric = Uint256::from_le_bytes(vec_to_bytes(update.clone().sync_committee_ssz));
-    let syncCommitteeSSZNumericBE = syncCommitteeSSZNumeric.to_be_bytes();
+    let sync_committee_ssz_numeric = Uint256::from_be_bytes(vec_to_bytes(update.clone().sync_committee_ssz));
+    let sync_committee_ssz_numeric_be = sync_committee_ssz_numeric.to_be_bytes();
     for i in 0..32 {
-        inputs[31-i] = syncCommitteeSSZNumericBE[i].to_string();
+        inputs[i] = sync_committee_ssz_numeric_be[i].to_string();
     }
 
-    let finalizedHeaderRootNumeric = Uint256::from_le_bytes(vec_to_bytes(update.clone().step.finalized_header_root));
-    let finalizedHeaderRootNumericBE = finalizedHeaderRootNumeric.to_be_bytes();
+    let finalized_header_root_numeric = Uint256::from_be_bytes(vec_to_bytes(update.clone().step.finalized_header_root));
+    let finalized_header_root_numeric_be = finalized_header_root_numeric.to_be_bytes();
     for i in 0..32 {
-        inputs[63-i] = finalizedHeaderRootNumericBE[i].to_string();
+        inputs[32+i] = finalized_header_root_numeric_be[i].to_string();
     }
 
     inputs[64] = Uint256::from_le_bytes(vec_to_bytes(update.clone().sync_committee_poseidon)).to_string();
 
-    let groth16Proof = update.clone().proof;
     let verifier = Verifier::new_rotate_verifier();
 
-    let mut circomProof = CircomProof::default();
-    circomProof.pi_a = groth16Proof.a;
-    circomProof.pi_b = groth16Proof.b;
-    circomProof.pi_c = groth16Proof.c;
-    circomProof.protocol = "groth16".to_string();
-    circomProof.curve = "bn128".to_string();
-    let proof = circomProof.to_proof();
-    // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
-    let publicSignals = PublicSignals::from(inputs);
+    let groth_16_proof = update.clone().proof;
 
-    println!("Public Signals: {:?}", publicSignals);
-    let result = verifier.verify_proof(proof, &publicSignals.get());
+    let circom_proof = CircomProof {
+        pi_a: groth_16_proof.a,
+        pi_b: groth_16_proof.b,
+        pi_c: groth_16_proof.c,
+        protocol: "groth16".to_string(),
+        curve: "bn128".to_string(),
+    };
+
+    let proof = circom_proof.to_proof();
+
+    let public_signals = PublicSignals::from(inputs);
+
+    println!("Public Signals: {:?}", public_signals);
+    let result = verifier.verify_proof(proof, &public_signals.get());
     println!("Result: {:?}", result);
     if result == false {
         return Err(ContractError::InvalidRotateProof { });
@@ -389,11 +406,11 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
     let mut state = STATE.load(deps.storage)?;
 
     let key = period.to_string();
-    let poseidonForPeriod = match sync_committee_poseidons.may_load(deps.storage, key.clone())?{
+    let poseidon_for_period = match sync_committee_poseidons.may_load(deps.storage, key.clone())?{
         Some(poseidon) => poseidon,
         None => vec![0; 32],
     };   
-    if poseidonForPeriod != [0; 32] && poseidonForPeriod != poseidon {
+    if poseidon_for_period != [0; 32] && poseidon_for_period != poseidon {
         state.consistent = false;
         return Ok(())
     }
@@ -412,12 +429,12 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
 
     let key = slot.to_string();
 
-    let rootForSlot = match headers.may_load(deps.storage, key.clone())?{
+    let root_for_slot = match headers.may_load(deps.storage, key.clone())?{
         Some(root) => root,
         None => vec![0; 32],
     };
     // If sync committee does not exist    
-    if rootForSlot != [0; 32] && rootForSlot != root {
+    if root_for_slot != [0; 32] && root_for_slot != root {
         state.consistent = false;
         return Ok(())
     }
@@ -439,12 +456,12 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Resu
 
     let key = slot.to_string();
 
-    let rootForSlot = match execution_state_roots.may_load(deps.storage, key.clone())?{
+    let root_for_slot = match execution_state_roots.may_load(deps.storage, key.clone())?{
         Some(root) => root,
         None => vec![0; 32],
     };
     // If sync committee does not exist    
-    if rootForSlot != [0; 32] && rootForSlot != root {
+    if root_for_slot != vec![0; 32] && root_for_slot != root {
         state.consistent = false;
         return Ok(())
     }
@@ -457,9 +474,9 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Resu
      * @dev Save the best update for the period.
      */
 fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
-    let periodStr = period.to_string();
+    let period_str = period.to_string();
     // TODO: Confirm save is the correct usage
-    best_updates.save(deps.storage, periodStr, &update);
+    let _res = best_updates.save(deps.storage, period_str, &update);
 }
 
 
@@ -469,7 +486,7 @@ fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{coins};
 
     #[test]
     fn proper_initialization() {
@@ -511,7 +528,7 @@ mod tests {
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
@@ -560,7 +577,7 @@ mod tests {
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
@@ -599,7 +616,7 @@ mod tests {
             proof: proof
         };
 
-        let sszProof = Groth16Proof {
+        let ssz_proof = Groth16Proof {
             a: vec!["19432175986645681540999611667567820365521443728844489852797484819167568900221".to_string(), "17819747348018194504213652705429154717568216715442697677977860358267208774881".to_string()],
             b: vec![vec!["19517979001366784491262985007208187156868482446794264383959847800886523509877".to_string(), "18685503971201701637279255177672737459369364286579884138384195256096640826544".to_string()], vec!["16475201747689810182851523453109345313415173394858409181213088485065940128783".to_string(), "12866135194889417072846904485239086915117156987867139218395654387586559304324".to_string()]],
             c: vec!["5276319441217508855890249255054235161211918914051110197093775833187899960891".to_string(), "14386728697935258641600181574898746001129655942955900029040036823246860905307".to_string()],
@@ -609,7 +626,7 @@ mod tests {
             step: step,
             sync_committee_ssz: hex::decode("c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94").unwrap(),
             sync_committee_poseidon: Uint256::from_str("13340003662261458565835017692041308090002736850267009725732232370707087749826").unwrap().to_le_bytes().to_vec(),
-            proof: sszProof, 
+            proof: ssz_proof, 
         };
 
         let msg = ExecuteMsg::Rotate {update: update};

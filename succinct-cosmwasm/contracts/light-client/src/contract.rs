@@ -10,7 +10,6 @@ use hex::{encode, decode};
 use sha2::{Digest, Sha256};
 // use byteorder::{LittleEndian, WriteBytesExt};
 
-use ssz::{Decode, Encode};
 use crate::verifier::Verifier;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, CircomProof, PublicSignals};
@@ -94,26 +93,27 @@ pub mod execute {
      *   2) A valid finality proof
      *   3) A valid execution state root proof
      */
-    pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<Response, ContractError>{
-        println!("Start step");
+    pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<(Response), ContractError>{
         let finalized = process_step(deps.as_ref(), update.clone());
+        if finalized.is_err() {
+            return Err(finalized.err().unwrap());
+        }
 
         let current_slot = get_current_slot(_env, deps.as_ref())?;
         if current_slot < update.finalized_slot {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
-        if finalized.unwrap() {
-            let _res = set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
-            if _res.is_err() {
-                return Err(_res.err().unwrap())
-            }
-            let _res = set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
-            if _res.is_err() {
-                return Err(_res.err().unwrap())
-            }
+        let _res = set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
+        if _res.is_err() {
+            return Err(_res.err().unwrap())
         }
 
+        let _res = set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
+        if _res.is_err() {
+            return Err(_res.err().unwrap())
+        }
+        
         // TODO: Add more specifics on response
         Ok(Response::new().add_attribute("action", "step"))
     }
@@ -132,10 +132,8 @@ pub mod execute {
 
         let next_period = current_period + Uint256::from(1u64);
 
-        //TODO: Finalize zk_light_client_rotate
         let result = zk_light_client_rotate(update.clone());
         if result.is_err() {
-            println!("Proof failed!");
             return Err(result.err().unwrap());
         }
 
@@ -146,7 +144,11 @@ pub mod execute {
             }
         } else {
             // TODO: load is if definitely there, if not there, must do may load
-            let best_update = best_updates.load(deps.storage, current_period.to_string())?;
+            let best_update = match best_updates.may_load(deps.storage, current_period.to_string())?{
+                Some(update) => update,
+                None => return Err(ContractError::BestUpdateNotInitialized {}),
+            };
+
             if step.participation < best_update.step.participation {
                 return Err(ContractError::ExistsBetterUpdate {});
             }
@@ -172,9 +174,9 @@ pub mod execute {
         };
         let slot = get_current_slot(_env, deps.as_ref())?;
 
-        if update.step.finalized_header_root == [0; 32] {
+        if update.step.finalized_header_root == vec![0; 32] {
             return Err(ContractError::BestUpdateNotInitialized {});
-        } else if next_sync_committee_poseidon != [0; 32] {
+        } else if next_sync_committee_poseidon != vec![0; 32] {
             return Err(ContractError::SyncCommitteeAlreadyInitialized {});
         } else if get_sync_committee_period(slot, deps.as_ref())? < next_period {
             return Err(ContractError::CurrentSyncCommitteeNotEnded {});
@@ -235,8 +237,8 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 // HELPER FUNCTIONS
 
     /*
-     * @dev Check validity of conditions for a light client step update.
-     */
+    * @dev Check validity of conditions for a light client step update.
+    */
 
 fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
     // Get current period
@@ -255,12 +257,11 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     // TODO: Ensure zk_light_client_step is complete
     let result = zk_light_client_step(deps, update.clone());
     if result.is_err() {
-        println!("Proof failed!");
         return Err(result.err().unwrap());
     }
     
-    let bool = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
-    return Ok(bool);
+    let enough_participation = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
+    return Ok(enough_participation);
 
 }
 
@@ -296,11 +297,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     temp[32..].copy_from_slice(&sync_committee_poseidon);
     h.copy_from_slice(&Sha256::digest(&temp));
 
-    // Make h little endian
     // TODO: Confirm this is the correct math!
-    // let mut t = Uint256::from_le_bytes(h);
-    // Only take first 253 bits (for babyjubjub)
-    // Bit math
 
     let mut t = [255u8; 32];
     t[31] = 0b00011111;
@@ -313,6 +310,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
 
     // Set proof
     let inputs_string = Uint256::from_le_bytes(t).to_string();
+    let inputs = vec![inputs_string.clone(); 1];
 
     // Init verifier
     let verifier = Verifier::new_step_verifier();
@@ -326,12 +324,9 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     };
     
     let proof = circom_proof.to_proof();
-    // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
-    let public_signals = PublicSignals::from_values(inputs_string);
+    let public_signals = PublicSignals::from(inputs);
 
-    println!("Public Signals: {:?}", public_signals);
     let result = verifier.verify_proof(proof, &public_signals.get());
-    println!("Result: {:?}", result);
     if result == false {
         return Err(ContractError::InvalidStepProof { });
     }
@@ -379,9 +374,8 @@ fn zk_light_client_rotate(update: LightClientRotate) -> Result<(), ContractError
 
     let public_signals = PublicSignals::from(inputs);
 
-    println!("Public Signals: {:?}", public_signals);
     let result = verifier.verify_proof(proof, &public_signals.get());
-    println!("Result: {:?}", result);
+
     if result == false {
         return Err(ContractError::InvalidRotateProof { });
     }
@@ -434,7 +428,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
         None => vec![0; 32],
     };
     // If sync committee does not exist    
-    if root_for_slot != [0; 32] && root_for_slot != root {
+    if root_for_slot != vec![0; 32] && root_for_slot != root {
         state.consistent = false;
         return Ok(())
     }
@@ -507,7 +501,7 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // it worked, let's query the state
+        // TODO: it worked, let's query the state
         // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         // let value: GetCountResponse = from_binary(&res).unwrap();
         // assert_eq!(17, value.count);
@@ -632,7 +626,7 @@ mod tests {
         let msg = ExecuteMsg::Rotate {update: update};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // should complete a rotate
+        // TODO: Perform query and confirm it completed a rotate
 
         // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         // let value: GetCountResponse = from_binary(&res).unwrap();

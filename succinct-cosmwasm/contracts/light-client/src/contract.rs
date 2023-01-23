@@ -236,7 +236,7 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
         Some(poseidon) => Some(poseidon),
         None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
     };
-    println!("Sync Committee Poseidon: {:?}", sync_committee_poseidon);
+    // println!("Sync Committee Poseidon: {:?}", sync_committee_poseidon);
 
     if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
@@ -303,7 +303,7 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
 
     // Set proof
     let inputs = &t;
-    println!("Inputs: {:?}", &inputs);
+    // println!("Inputs: {:?}", &inputs);
     let inputsString = Uint256::from_le_bytes(t).to_string();
     // let inputsArray = vec![inputsString.clone()];
 
@@ -316,13 +316,13 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     circomProof.pi_c = groth16Proof.c;
     circomProof.protocol = "groth16".to_string();
     circomProof.curve = "bn128".to_string();
-    println!("Circom Proof: {:?}", circomProof);
+    // println!("Circom Proof: {:?}", circomProof);
     let proof = circomProof.to_proof();
-
+    println!("Proof: {:?}", proof);
     // let publicSignals = PublicSignals::from_values("11375407177000571624392859794121663751494860578980775481430212221322179592816".to_string());
     let publicSignals = PublicSignals::from_values(inputsString);
 
-    println!("Proof: {:?}", proof);
+    // println!("Proof: {:?}", proof);
     println!("Public Signals: {:?}", publicSignals);
     let result = verifier.verify_proof(proof, &publicSignals.get());
     println!("Result: {:?}", result);
@@ -500,7 +500,7 @@ mod tests {
         // TODO: USING PROOF FROM testStep() in LightClient.t.sol
         let proof = Groth16Proof {
             a: vec!["14717729948616455402271823418418032272798439132063966868750456734930753033999".to_string(), "10284862272179454279380723177303354589165265724768792869172425850641532396958".to_string()],
-            b: vec![vec!["20094085308485991030092338753416508135313449543456147939097124612984047201335".to_string(), "11269943315518713067124801671029240901063146909738584854987772776806315890545".to_string()], vec!["5111528818556913201486596055325815760919897402988418362773344272232635103877".to_string(), "8122139689435793554974799663854817979475528090524378333920791336987132768041".to_string()]],
+            b: vec![vec!["11269943315518713067124801671029240901063146909738584854987772776806315890545".to_string(), "20094085308485991030092338753416508135313449543456147939097124612984047201335".to_string()], vec!["8122139689435793554974799663854817979475528090524378333920791336987132768041".to_string(), "5111528818556913201486596055325815760919897402988418362773344272232635103877".to_string()]],
             c: vec!["6410073677012431469384941862462268198904303371106734783574715889381934207004".to_string(), "11977981471972649035068934866969447415783144961145315609294880087827694234248".to_string()],
         };
 
@@ -512,6 +512,9 @@ mod tests {
             proof: proof
         };
         println!("{:?}", update);
+        // println!("{:?}", hex::encode(update.finalized_header_root.clone()));
+        // println!("{:?}", hex::encode(update.execution_state_root.clone()));
+
         let msg = ExecuteMsg::Step {update: update};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         println!("{:?}", _res);

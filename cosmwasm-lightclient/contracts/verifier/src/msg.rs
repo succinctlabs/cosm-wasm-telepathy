@@ -7,10 +7,10 @@ use crate::state::{LightClientStep, LightClientRotate};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub genesis_validators_root: Vec<u8>,
-    pub genesis_time: Uint256,
-    pub seconds_per_slot: Uint256,
-    pub slots_per_period: Uint256,
-    pub sync_committee_period: Uint256,
+    pub genesis_time: u64,
+    pub seconds_per_slot: u64,
+    pub slots_per_period: u64,
+    pub sync_committee_period: u64,
     pub sync_committee_poseidon: Vec<u8>,
 }
 

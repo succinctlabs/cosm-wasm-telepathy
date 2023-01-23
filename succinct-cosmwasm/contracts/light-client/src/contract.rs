@@ -94,7 +94,7 @@ pub mod execute {
      *   3) A valid execution state root proof
      */
     pub fn step(_env: Env, mut deps: DepsMut, update: LightClientStep) -> Result<(Response), ContractError>{
-        let finalized = process_step(deps.as_ref(), update.clone());
+        let finalized = process_step(deps.as_ref(), &update);
         if finalized.is_err() {
             return Err(finalized.err().unwrap());
         }
@@ -125,14 +125,14 @@ pub mod execute {
      */
     pub fn rotate(deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
 
-        let step = update.clone().step;
-        let finalized = process_step(deps.as_ref(), step.clone())?;
+        let step = &update.step;
+        let finalized = process_step(deps.as_ref(), &step)?;
 
         let current_period = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
 
         let next_period = current_period + Uint256::from(1u64);
 
-        let result = zk_light_client_rotate(update.clone());
+        let result = zk_light_client_rotate(&update);
         if result.is_err() {
             return Err(result.err().unwrap());
         }
@@ -240,7 +240,7 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     * @dev Check validity of conditions for a light client step update.
     */
 
-fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractError> {
+fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractError> {
     // Get current period
     let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
 
@@ -255,7 +255,7 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     }
 
     // TODO: Ensure zk_light_client_step is complete
-    let result = zk_light_client_step(deps, update.clone());
+    let result = zk_light_client_step(deps, &update);
     if result.is_err() {
         return Err(result.err().unwrap());
     }
@@ -270,7 +270,7 @@ fn process_step(deps: Deps, update: LightClientStep) -> Result<bool, ContractErr
     /*
     * @dev Proof logic for step!
     */
-fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), ContractError> {
+fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), ContractError> {
     // Set up initial bytes
     let finalized_slot_le = update.finalized_slot.to_le_bytes();
     let participation_le = update.participation.to_le_bytes();
@@ -305,15 +305,16 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     for i in 0..32 {
         t[i] = t[i] & h[i];
     }
-    // TODO: Remove Groth16Proof struct?
-    let groth_16_proof = update.clone().proof;
 
     // Set proof
     let inputs_string = Uint256::from_le_bytes(t).to_string();
-    let inputs = vec![inputs_string.clone(); 1];
+    let inputs = vec![inputs_string; 1];
 
     // Init verifier
     let verifier = Verifier::new_step_verifier();
+
+    // TODO: Remove Groth16Proof struct?
+    let groth_16_proof = update.proof.clone();
 
     let circom_proof = CircomProof {
         pi_a: groth_16_proof.a,
@@ -339,28 +340,28 @@ fn zk_light_client_step(deps: Deps, update: LightClientStep) -> Result<(), Contr
     /*
     * @dev Proof logic for rotate!
     */
-fn zk_light_client_rotate(update: LightClientRotate) -> Result<(), ContractError> {
+fn zk_light_client_rotate(update: &LightClientRotate) -> Result<(), ContractError> {
 
     let mut inputs = vec!["0".to_string(); 65];
 
     // Set up inputs correctly
-    let sync_committee_ssz_numeric = Uint256::from_be_bytes(vec_to_bytes(update.clone().sync_committee_ssz));
+    let sync_committee_ssz_numeric = Uint256::from_be_bytes(vec_to_bytes(&update.sync_committee_ssz));
     let sync_committee_ssz_numeric_be = sync_committee_ssz_numeric.to_be_bytes();
     for i in 0..32 {
         inputs[i] = sync_committee_ssz_numeric_be[i].to_string();
     }
 
-    let finalized_header_root_numeric = Uint256::from_be_bytes(vec_to_bytes(update.clone().step.finalized_header_root));
+    let finalized_header_root_numeric = Uint256::from_be_bytes(vec_to_bytes(&update.step.finalized_header_root));
     let finalized_header_root_numeric_be = finalized_header_root_numeric.to_be_bytes();
     for i in 0..32 {
         inputs[32+i] = finalized_header_root_numeric_be[i].to_string();
     }
 
-    inputs[64] = Uint256::from_le_bytes(vec_to_bytes(update.clone().sync_committee_poseidon)).to_string();
+    inputs[64] = Uint256::from_le_bytes(vec_to_bytes(&update.sync_committee_poseidon)).to_string();
 
     let verifier = Verifier::new_rotate_verifier();
 
-    let groth_16_proof = update.clone().proof;
+    let groth_16_proof = update.proof.clone();
 
     let circom_proof = CircomProof {
         pi_a: groth_16_proof.a,
@@ -382,7 +383,7 @@ fn zk_light_client_rotate(update: LightClientRotate) -> Result<(), ContractError
     Ok(())
 }
 
-fn vec_to_bytes(vec: Vec<u8>) -> [u8; 32] {
+fn vec_to_bytes(vec: &Vec<u8>) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(&vec);
     return bytes;
@@ -399,8 +400,7 @@ fn vec_to_bytes(vec: Vec<u8>) -> [u8; 32] {
 fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
     let mut state = STATE.load(deps.storage)?;
 
-    let key = period.to_string();
-    let poseidon_for_period = match sync_committee_poseidons.may_load(deps.storage, key.clone())?{
+    let poseidon_for_period = match sync_committee_poseidons.may_load(deps.storage, period.to_string())?{
         Some(poseidon) => poseidon,
         None => vec![0; 32],
     };   
@@ -408,7 +408,7 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
         state.consistent = false;
         return Ok(())
     }
-    sync_committee_poseidons.save(deps.storage, key.clone(), &poseidon)?;
+    sync_committee_poseidons.save(deps.storage, period.to_string(), &poseidon)?;
 
     // TODO: Emit event
     return Ok(())
@@ -421,9 +421,7 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
 fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
     let mut state = STATE.load(deps.storage)?;
 
-    let key = slot.to_string();
-
-    let root_for_slot = match headers.may_load(deps.storage, key.clone())?{
+    let root_for_slot = match headers.may_load(deps.storage, slot.to_string())?{
         Some(root) => root,
         None => vec![0; 32],
     };
@@ -435,7 +433,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
 
     state.head = slot;
 
-    headers.save(deps.storage, key.clone(), &root)?;
+    headers.save(deps.storage, slot.to_string(), &root)?;
 
     // TODO: Add emit event for HeadUpdate
     return Ok(())
@@ -450,7 +448,7 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Resu
 
     let key = slot.to_string();
 
-    let root_for_slot = match execution_state_roots.may_load(deps.storage, key.clone())?{
+    let root_for_slot = match execution_state_roots.may_load(deps.storage, slot.to_string())?{
         Some(root) => root,
         None => vec![0; 32],
     };
@@ -460,7 +458,7 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Resu
         return Ok(())
     }
 
-    execution_state_roots.save(deps.storage, key.clone(), &root)?;
+    execution_state_roots.save(deps.storage, slot.to_string(), &root)?;
     return Ok(())
 }
 

@@ -513,17 +513,18 @@ mod tests {
         // assert_eq!(18, value.count);
     }
 
+    // Following testRotate in LightClient.t.sol
     #[test]
     fn rotate() {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: vec![0; 32],
-            genesis_time: Uint256::from(0u64),
-            seconds_per_slot: Uint256::from(0u64),
-            slots_per_period: Uint256::from(0u64),
-            sync_committee_period: Uint256::from(0u64),
-            sync_committee_poseidon: vec![0; 32], 
+            genesis_validators_root: hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap(),
+            genesis_time: Uint256::from(1616508000u64),
+            seconds_per_slot: Uint256::from(12u64),
+            slots_per_period: Uint256::from(8192u64),
+            sync_committee_period: Uint256::from(532u64),
+            sync_committee_poseidon: Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes().to_vec(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -533,30 +534,50 @@ mod tests {
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
 
+
+        // uint256[2] memory a = [
+        //     2389393404492058253160068022258603729350770245558596428430133000235269498543,
+        //     10369223312690872346127509312343439494640770569110984786213351208635909948543
+        // ];
+        // uint256[2][2] memory b = [
+        //     [
+        //         10181085549071219170085204492459257955822340639736743687662735377741773005552,
+        //         11815959921059098071620606293769973610509565967606374482200288258603855668773
+        //     ],
+        //     [
+        //         14404189974461708010365785617881368513005872936409632496299813856721680720909,
+        //         4596699114942981172597823241348081341260261170814329779716288274614793962155
+        //     ]
+        // ];
+        // uint256[2] memory c = [
+        //     9035222358509333553848504918662877956429157268124015769960938782858405579405,
+        //     10878155942650055578211805190943912843265267774943864267206635407924778282720
+        // ];
+
         let proof = Groth16Proof {
-            a: vec!["0".to_string(), "0".to_string()],
-            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
-            c: vec!["0".to_string(), "0".to_string()],
+            a: vec!["2389393404492058253160068022258603729350770245558596428430133000235269498543".to_string(), "10369223312690872346127509312343439494640770569110984786213351208635909948543".to_string()],
+            b: vec![vec!["11815959921059098071620606293769973610509565967606374482200288258603855668773".to_string(), "10181085549071219170085204492459257955822340639736743687662735377741773005552".to_string()], vec!["4596699114942981172597823241348081341260261170814329779716288274614793962155".to_string(), "14404189974461708010365785617881368513005872936409632496299813856721680720909".to_string()]],
+            c: vec!["9035222358509333553848504918662877956429157268124015769960938782858405579405".to_string(), "10878155942650055578211805190943912843265267774943864267206635407924778282720".to_string()],
         };
 
         let step = LightClientStep {
-            finalized_slot: Uint256::from(0u64),
-            participation: Uint256::from(0u64),
-            finalized_header_root: vec![0; 32],
-            execution_state_root: vec![0; 32],
+            finalized_slot: Uint256::from(4360032u64),
+            participation: Uint256::from(413u64),
+            finalized_header_root: hex::decode("b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30").unwrap(),
+            execution_state_root: hex::decode("ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb").unwrap(),
             proof: proof
         };
 
         let sszProof = Groth16Proof {
-            a: vec!["0".to_string(), "0".to_string()],
-            b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
-            c: vec!["0".to_string(), "0".to_string()],
+            a: vec!["19432175986645681540999611667567820365521443728844489852797484819167568900221".to_string(), "17819747348018194504213652705429154717568216715442697677977860358267208774881".to_string()],
+            b: vec![vec!["19517979001366784491262985007208187156868482446794264383959847800886523509877".to_string(), "18685503971201701637279255177672737459369364286579884138384195256096640826544".to_string()], vec!["16475201747689810182851523453109345313415173394858409181213088485065940128783".to_string(), "12866135194889417072846904485239086915117156987867139218395654387586559304324".to_string()]],
+            c: vec!["5276319441217508855890249255054235161211918914051110197093775833187899960891".to_string(), "14386728697935258641600181574898746001129655942955900029040036823246860905307".to_string()],
         };
 
         let update: LightClientRotate = LightClientRotate {
             step: step,
-            sync_committee_ssz: vec![0; 32],
-            sync_committee_poseidon: vec![0; 32],
+            sync_committee_ssz: hex::decode("c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94").unwrap(),
+            sync_committee_poseidon: Uint256::from_str("13340003662261458565835017692041308090002736850267009725732232370707087749826").unwrap().to_le_bytes().to_vec(),
             proof: sszProof, 
         };
 

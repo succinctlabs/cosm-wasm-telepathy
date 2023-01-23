@@ -103,16 +103,16 @@ pub mod execute {
         }
 
         let current_slot = get_current_slot(_env, deps.as_ref())?;
-        if current_slot < update.finalized_slot {
+        if current_slot < Uint256::from(update.finalized_slot) {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
-        let _res = set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
+        let _res = set_head(deps.branch(), Uint256::from(update.finalized_slot), update.finalized_header_root);
         if _res.is_err() {
             return Err(_res.err().unwrap())
         }
 
-        let _res = set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
+        let _res = set_execution_state_root(deps.branch(), Uint256::from(update.finalized_slot), update.execution_state_root);
         if _res.is_err() {
             return Err(_res.err().unwrap())
         }
@@ -131,7 +131,7 @@ pub mod execute {
         let step = &update.step;
         let finalized = process_step(deps.as_ref(), &step)?;
 
-        let current_period = get_sync_committee_period(step.finalized_slot, deps.as_ref())?;
+        let current_period = get_sync_committee_period(Uint256::from(step.finalized_slot), deps.as_ref())?;
 
         let next_period = current_period + Uint256::from(1u64);
 
@@ -152,7 +152,7 @@ pub mod execute {
                 None => return Err(ContractError::BestUpdateNotInitialized {}),
             };
 
-            if step.participation < best_update.step.participation {
+            if Uint256::from(step.participation) < Uint256::from(best_update.step.participation) {
                 return Err(ContractError::ExistsBetterUpdate {});
             }
             set_best_update(deps, current_period, update);
@@ -254,7 +254,7 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 
 fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractError> {
     // Get current period
-    let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
+    let current_period = get_sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
 
     // Load poseidon for period
     let _sync_committee_poseidon = match SYNC_COMMITTEE_POSEIDONS.may_load(deps.storage, current_period.to_string())? {
@@ -262,7 +262,7 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
         None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
     };
 
-    if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+    if Uint256::from(update.participation) < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
     }
 
@@ -272,7 +272,7 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
         return Err(result.err().unwrap());
     }
     
-    let enough_participation = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
+    let enough_participation = Uint256::from(3u64) * Uint256::from(update.participation) > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
     return Ok(enough_participation);
 
 }
@@ -284,9 +284,9 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
     */
 fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), ContractError> {
     // Set up initial bytes
-    let finalized_slot_le = update.finalized_slot.to_le_bytes();
-    let participation_le = update.participation.to_le_bytes();
-    let current_period = get_sync_committee_period(update.finalized_slot, deps)?;
+    let finalized_slot_le = Uint256::from(update.finalized_slot).to_le_bytes();
+    let participation_le = Uint256::from(update.participation).to_le_bytes();
+    let current_period = get_sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
     let sync_committee_poseidon = SYNC_COMMITTEE_POSEIDONS.load(deps.storage, current_period.to_string())?;
 
 
@@ -559,8 +559,8 @@ mod tests {
         };
 
         let update = LightClientStep {
-            finalized_slot: Uint256::from(4359840u64),
-            participation: Uint256::from(432u64),
+            finalized_slot: 4359840,
+            participation: 432u64,
             finalized_header_root: hex::decode("70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653").unwrap(),
             execution_state_root: hex::decode("69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58").unwrap(),
             proof: proof
@@ -627,8 +627,8 @@ mod tests {
         };
 
         let step = LightClientStep {
-            finalized_slot: Uint256::from(4360032u64),
-            participation: Uint256::from(413u64),
+            finalized_slot: 4360032,
+            participation: 413,
             finalized_header_root: hex::decode("b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30").unwrap(),
             execution_state_root: hex::decode("ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb").unwrap(),
             proof: proof

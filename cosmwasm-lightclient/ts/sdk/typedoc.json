@@ -1,0 +1,7 @@
+{
+  "out": "./docs",
+  "name": "cosmwasm-lightclient",
+  "theme": "markdown",
+  "readme": "none",
+  "tsconfig": "./tsconfig.bundle.json"
+}

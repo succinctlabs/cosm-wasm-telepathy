@@ -4,6 +4,7 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Re
 use cw2::set_contract_version;
 
 use sha2::{Digest, Sha256};
+use std::str::{FromStr};
 
 
 use crate::state::{STATE, State, CircomProof, Groth16Proof, LightClientStep, LightClientRotate, PublicSignals, HEADERS, EXECUTION_STATE_ROOTS, SYNC_COMMITTEE_POSEIDONS, BEST_UPDATES};
@@ -90,8 +91,8 @@ pub fn execute(
             proof_c, } => execute::step(_env, deps, LightClientStep {
                 finalized_slot: Uint256::from(finalized_slot),
                 participation: Uint256::from(participation),
-                finalized_header_root: finalized_header_root.to_vec(),
-                execution_state_root: execution_state_root.to_vec(),
+                finalized_header_root: hex::decode(finalized_header_root).unwrap(),
+                execution_state_root: hex::decode(execution_state_root).unwrap(),
                 proof: Groth16Proof {
                     a: proof_a.to_vec(),
                     b: vec![proof_b[0].to_vec(), proof_b[1].to_vec()],
@@ -113,16 +114,16 @@ pub fn execute(
                 step: LightClientStep {
                     finalized_slot: Uint256::from(finalized_slot),
                     participation: Uint256::from(participation),
-                    finalized_header_root: finalized_header_root.to_vec(),
-                    execution_state_root: execution_state_root.to_vec(),
+                    finalized_header_root: hex::decode(finalized_header_root).unwrap(),
+                    execution_state_root: hex::decode(execution_state_root).unwrap(),
                     proof: Groth16Proof {
                         a: step_proof_a.to_vec(),
                         b: vec![step_proof_b[0].to_vec(), step_proof_b[1].to_vec()],
                         c: step_proof_c.to_vec(),
                     }
                 }, 
-                sync_committee_ssz: sync_committee_ssz.to_vec(), 
-                sync_committee_poseidon: sync_committee_poseidon.to_vec(), 
+                sync_committee_ssz: hex::decode(sync_committee_ssz).unwrap(), 
+                sync_committee_poseidon: Uint256::from_str(&sync_committee_poseidon).unwrap().to_le_bytes().to_vec(), 
                 proof: Groth16Proof {
                     a: rotate_proof_a.to_vec(),
                     b: vec![rotate_proof_b[0].to_vec(), rotate_proof_b[1].to_vec()],
@@ -615,8 +616,8 @@ mod tests {
         };
         println!("{:?}", update);
 
-        let finalized_header_root: [u8;32] = update.finalized_header_root.try_into().unwrap();
-        let execution_state_root: [u8;32] = update.execution_state_root.try_into().unwrap();
+        let finalized_header_root: String = "70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653".to_string();
+        let execution_state_root: String = "69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58".to_string();
 
         let proof_a: [String; 2] = update.proof.a.try_into().unwrap();
         let proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];
@@ -715,15 +716,15 @@ mod tests {
         };
         println!("update: {:?}", update);
 
-        let finalized_header_root: [u8;32] = step.finalized_header_root.try_into().unwrap();
-        let execution_state_root: [u8;32] = step.execution_state_root.try_into().unwrap();
+        let finalized_header_root: String = "b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30".to_string();
+        let execution_state_root: String = "ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb".to_string();
 
         let step_proof_a: [String; 2] = step.proof.a.try_into().unwrap();
         let step_proof_b: [[String; 2]; 2] = [step.proof.b[0].clone().try_into().unwrap(), step.proof.b[1].clone().try_into().unwrap()];
         let step_proof_c: [String; 2] = step.proof.c.try_into().unwrap();
 
-        let sync_committee_ssz: [u8;32] = update.sync_committee_ssz.try_into().unwrap();
-        let sync_committee_poseidon: [u8;32] = update.sync_committee_poseidon.try_into().unwrap();
+        let sync_committee_ssz: String = "c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94".to_string();
+        let sync_committee_poseidon: String = "13340003662261458565835017692041308090002736850267009725732232370707087749826".to_string();
 
         let rotate_proof_a: [String; 2] = update.proof.a.try_into().unwrap();
         let rotate_proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];

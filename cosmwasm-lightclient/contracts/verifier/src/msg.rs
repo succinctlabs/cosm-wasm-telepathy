@@ -46,8 +46,6 @@ pub enum QueryMsg {
 }
 
 // We define a custom struct for each query response
-// #[cw_serde]
-// pub struct YourQueryResponse {}
 #[cw_serde]
 pub struct GetSyncCommitteePeriodResponse {
     pub period: Uint256

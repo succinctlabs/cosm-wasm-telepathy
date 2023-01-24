@@ -5,8 +5,6 @@ use cosmwasm_schema::cw_serde;
 
 use std::str::FromStr;
 
-use schemars::JsonSchema;
-
 use ark_bn254::{Bn254, Fr, G1Affine, G2Affine};
 use ark_ff::{Fp256, QuadExtField};
 use ark_groth16::Proof;

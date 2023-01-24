@@ -17,9 +17,9 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const MIN_SYNC_COMMITTEE_PARTICIPANTS: u64 = 10;
 const SYNC_COMMITTEE_SIZE: u64 = 512;
-const FINALIZED_ROOT_INDEX: u64 = 105;
-const NEXT_SYNC_COMMITTEE_SIZE: u64 = 55;
-const EXECUTION_STATE_ROOT_INDEX: u64 = 402;
+// const FINALIZED_ROOT_INDEX: u64 = 105;
+// const NEXT_SYNC_COMMITTEE_SIZE: u64 = 55;
+// const EXECUTION_STATE_ROOT_INDEX: u64 = 402;
 
 /// Handling contract instantiation
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -90,12 +90,12 @@ pub fn execute(
             proof_c, } => execute::step(_env, deps, LightClientStep {
                 finalized_slot: Uint256::from(finalized_slot),
                 participation: Uint256::from(participation),
-                finalized_header_root,
-                execution_state_root,
+                finalized_header_root: finalized_header_root.to_vec(),
+                execution_state_root: execution_state_root.to_vec(),
                 proof: Groth16Proof {
-                    a: proof_a,
-                    b: proof_b,
-                    c: proof_c,
+                    a: proof_a.to_vec(),
+                    b: vec![proof_b[0].to_vec(), proof_b[1].to_vec()],
+                    c: proof_c.to_vec(),
                 }
             }),
         ExecuteMsg::Rotate { finalized_slot,
@@ -615,13 +615,19 @@ mod tests {
         };
         println!("{:?}", update);
 
+        let finalized_header_root: [u8;32] = update.finalized_header_root.try_into().unwrap();
+        let execution_state_root: [u8;32] = update.execution_state_root.try_into().unwrap();
+
+        let proof_a: [String; 2] = update.proof.a.try_into().unwrap();
+        let proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];
+        let proof_c: [String; 2] = update.proof.c.try_into().unwrap();
         let msg = ExecuteMsg::Step {finalized_slot: finalized_slot,
             participation: participation,
-            finalized_header_root: update.finalized_header_root,
-            execution_state_root: update.execution_state_root,
-            proof_a: update.proof.a,
-            proof_b: update.proof.b,
-            proof_c: update.proof.c,};
+            finalized_header_root: finalized_header_root,
+            execution_state_root: execution_state_root,
+            proof_a: proof_a,
+            proof_b: proof_b,
+            proof_c: proof_c};
         
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         println!("{:?}", _res);

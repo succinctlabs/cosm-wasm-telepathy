@@ -1,8 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Uint256};
 
-use crate::state::{LightClientStep, LightClientRotate};
-
 /// Message type for `instantiate` entry_point
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -20,11 +18,11 @@ pub enum ExecuteMsg {
     Step {
         finalized_slot: u32,
         participation: u32,
-        finalized_header_root: Vec<u8>,
-        execution_state_root: Vec<u8>,
-        proof_a: Vec<String>,
-        proof_b: Vec<Vec<String>>,
-        proof_c: Vec<String>,
+        finalized_header_root: [u8; 32],
+        execution_state_root: [u8; 32],
+        proof_a: [String; 2],
+        proof_b: [[String; 2]; 2],
+        proof_c: [String; 2],
     },
     Rotate {
         finalized_slot: u32,

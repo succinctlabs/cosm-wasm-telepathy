@@ -87,12 +87,12 @@ impl CircomProof {
             curve: "bn254".to_string(),
         }
     }
-    pub fn from(json_str: String) -> Self {
-        println!("json_str: {}", json_str);
-        let unwrapped_json: CircomProof = serde_json::from_str(&json_str).expect("JSON was not well-formatted");
-        println!("unwrapped_json: {:?}", unwrapped_json);
-        return unwrapped_json;
-    }
+    // pub fn from(json_str: String) -> Self {
+    //     println!("json_str: {}", json_str);
+    //     let unwrapped_json: CircomProof = serde_json::from_str(&json_str).expect("JSON was not well-formatted");
+    //     println!("unwrapped_json: {:?}", unwrapped_json);
+    //     return unwrapped_json;
+    // }
 
     pub fn to_proof(self) -> Proof<Bn254> {
         // println!("pi_a: {:?}", self.pi_a);

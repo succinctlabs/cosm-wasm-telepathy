@@ -147,7 +147,7 @@ pub mod execute {
             return Err(finalized.err().unwrap());
         }
 
-        let current_slot = get_current_slot(_env, deps.as_ref())?;
+        let current_slot = current_slot(_env, deps.as_ref())?;
         if current_slot < Uint256::from(update.finalized_slot) {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
@@ -176,7 +176,7 @@ pub mod execute {
         let step = &update.step;
         let finalized = process_step(deps.as_ref(), &step)?;
 
-        let current_period = get_sync_committee_period(Uint256::from(step.finalized_slot), deps.as_ref())?;
+        let current_period = sync_committee_period(Uint256::from(step.finalized_slot), deps.as_ref())?;
 
         let next_period = current_period + Uint256::from(1u64);
 
@@ -220,11 +220,11 @@ pub mod execute {
             Some(poseidon) => poseidon,
             None => return Err(ContractError::SyncCommitteeAlreadyInitialized {}),
         };
-        let slot = get_current_slot(_env, deps.as_ref())?;
+        let slot = current_slot(_env, deps.as_ref())?;
 
         if update.step.finalized_header_root == vec![0; 32] {
             return Err(ContractError::BestUpdateNotInitialized {});
-        } else if get_sync_committee_period(slot, deps.as_ref())? < next_period {
+        } else if sync_committee_period(slot, deps.as_ref())? < next_period {
             return Err(ContractError::CurrentSyncCommitteeNotEnded {});
         }
 
@@ -244,8 +244,8 @@ pub mod execute {
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetSyncCommitteePeriod { slot } => to_binary(&query::getSyncCommitteePeriod(slot, deps)?),
-        QueryMsg::GetCurrentSlot {} => to_binary(&query::getCurrentSlot(_env, deps)?),
+        QueryMsg::GetSyncCommitteePeriod { slot } => to_binary(&query::get_sync_committee_period(slot, deps)?),
+        QueryMsg::GetCurrentSlot {} => to_binary(&query::get_current_slot(_env, deps)?),
     }
 }
 
@@ -254,13 +254,13 @@ pub mod query {
 
     use super::*;
 
-    pub fn getSyncCommitteePeriod(slot: Uint256, deps: Deps) -> StdResult<GetSyncCommitteePeriodResponse> {
-        let period = get_sync_committee_period(slot, deps)?;
+    pub fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<GetSyncCommitteePeriodResponse> {
+        let period = sync_committee_period(slot, deps)?;
         Ok(GetSyncCommitteePeriodResponse { period: period })
     }
 
-    pub fn getCurrentSlot(_env: Env, deps: Deps) -> StdResult<GetCurrentSlotResponse> {
-        let slot = get_current_slot(_env, deps)?;
+    pub fn get_current_slot(_env: Env, deps: Deps) -> StdResult<GetCurrentSlotResponse> {
+        let slot = current_slot(_env, deps)?;
         Ok(GetCurrentSlotResponse { slot: slot })
     }
 }
@@ -277,12 +277,12 @@ pub fn reply(_deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, Contrac
 
 // View functions
 
-fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
+fn sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = STATE.load(deps.storage)?;
     Ok(slot / state.slots_per_period)
 }
 
-fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
+fn current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     let state = STATE.load(deps.storage)?;
     let block = _env.block;
     let timestamp = Uint256::from(block.time.seconds());
@@ -299,7 +299,7 @@ fn get_current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 
 fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractError> {
     // Get current period
-    let current_period = get_sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
+    let current_period = sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
 
     // Load poseidon for period
     let _sync_committee_poseidon = match SYNC_COMMITTEE_POSEIDONS.may_load(deps.storage, current_period.to_string())? {
@@ -331,7 +331,7 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
     // Set up initial bytes
     let finalized_slot_le = Uint256::from(update.finalized_slot).to_le_bytes();
     let participation_le = Uint256::from(update.participation).to_le_bytes();
-    let current_period = get_sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
+    let current_period = sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
     let sync_committee_poseidon = SYNC_COMMITTEE_POSEIDONS.load(deps.storage, current_period.to_string())?;
 
 

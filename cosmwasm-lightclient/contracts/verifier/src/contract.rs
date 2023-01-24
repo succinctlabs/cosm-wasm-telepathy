@@ -568,19 +568,6 @@ mod tests {
     fn step() {
         let mut deps = mock_dependencies();
 
-        let genesis_validators_root = hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap();
-        println!("genesis_validators_root: {:?}", genesis_validators_root);
-        let genesis_time = Uint256::from(1616508000u64);
-        println!("genesis_time: {:?}", genesis_time);
-        let seconds_per_slot = Uint256::from(12u64);
-        println!("seconds_per_slot: {:?}", seconds_per_slot);
-        let slots_per_period = Uint256::from(8192u64);
-        println!("slots_per_period: {:?}", slots_per_period);
-        let sync_committee_period = Uint256::from(532u64);
-        println!("sync_committee_period: {:?}", sync_committee_period);
-        let sync_committee_poseidon = Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes().to_vec();
-        println!("sync_committee_poseidon: {:?}", sync_committee_poseidon);
-
         let genesis_validators_root: [u8; 32] = hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap().try_into().unwrap();
         let sync_committee_poseidon: [u8; 32] = Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes();
         let msg = InstantiateMsg { 
@@ -607,21 +594,13 @@ mod tests {
         };
         let finalized_slot: u32 = 4359840;
         let participation: u32 = 432;
-        let update = LightClientStep {
-            finalized_slot: Uint256::from(finalized_slot),
-            participation: Uint256::from(participation),
-            finalized_header_root: hex::decode("70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653").unwrap(),
-            execution_state_root: hex::decode("69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58").unwrap(),
-            proof: proof
-        };
-        println!("{:?}", update);
 
         let finalized_header_root: String = "70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653".to_string();
         let execution_state_root: String = "69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58".to_string();
 
-        let proof_a: [String; 2] = update.proof.a.try_into().unwrap();
-        let proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];
-        let proof_c: [String; 2] = update.proof.c.try_into().unwrap();
+        let proof_a: [String; 2] = proof.a.try_into().unwrap();
+        let proof_b: [[String; 2]; 2] = [proof.b[0].clone().try_into().unwrap(), proof.b[1].clone().try_into().unwrap()];
+        let proof_c: [String; 2] = proof.c.try_into().unwrap();
         let msg = ExecuteMsg::Step {finalized_slot: finalized_slot,
             participation: participation,
             finalized_header_root: finalized_header_root,
@@ -693,13 +672,6 @@ mod tests {
 
         let finalized_slot: u32 = 4360032;
         let participation: u32 = 413;
-        let step = LightClientStep {
-            finalized_slot: Uint256::from(finalized_slot),
-            participation: Uint256::from(participation),
-            finalized_header_root: hex::decode("b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30").unwrap(),
-            execution_state_root: hex::decode("ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb").unwrap(),
-            proof: proof
-        };
         // println!("step: {:?}", step);
         let ssz_proof = Groth16Proof {
             a: vec!["19432175986645681540999611667567820365521443728844489852797484819167568900221".to_string(), "17819747348018194504213652705429154717568216715442697677977860358267208774881".to_string()],
@@ -707,28 +679,19 @@ mod tests {
             c: vec!["5276319441217508855890249255054235161211918914051110197093775833187899960891".to_string(), "14386728697935258641600181574898746001129655942955900029040036823246860905307".to_string()],
         };
 
-        let update: LightClientRotate = LightClientRotate {
-            // TODO: Fix this with borrow
-            step: step.clone(),
-            sync_committee_ssz: hex::decode("c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94").unwrap(),
-            sync_committee_poseidon: Uint256::from_str("13340003662261458565835017692041308090002736850267009725732232370707087749826").unwrap().to_le_bytes().to_vec(),
-            proof: ssz_proof, 
-        };
-        println!("update: {:?}", update);
-
         let finalized_header_root: String = "b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30".to_string();
         let execution_state_root: String = "ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb".to_string();
 
-        let step_proof_a: [String; 2] = step.proof.a.try_into().unwrap();
-        let step_proof_b: [[String; 2]; 2] = [step.proof.b[0].clone().try_into().unwrap(), step.proof.b[1].clone().try_into().unwrap()];
-        let step_proof_c: [String; 2] = step.proof.c.try_into().unwrap();
+        let step_proof_a: [String; 2] = proof.a.try_into().unwrap();
+        let step_proof_b: [[String; 2]; 2] = [proof.b[0].clone().try_into().unwrap(), proof.b[1].clone().try_into().unwrap()];
+        let step_proof_c: [String; 2] = proof.c.try_into().unwrap();
 
         let sync_committee_ssz: String = "c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94".to_string();
         let sync_committee_poseidon: String = "13340003662261458565835017692041308090002736850267009725732232370707087749826".to_string();
 
-        let rotate_proof_a: [String; 2] = update.proof.a.try_into().unwrap();
-        let rotate_proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];
-        let rotate_proof_c: [String; 2] = update.proof.c.try_into().unwrap();
+        let rotate_proof_a: [String; 2] = ssz_proof.a.try_into().unwrap();
+        let rotate_proof_b: [[String; 2]; 2] = [ssz_proof.b[0].clone().try_into().unwrap(), ssz_proof.b[1].clone().try_into().unwrap()];
+        let rotate_proof_c: [String; 2] = ssz_proof.c.try_into().unwrap();
 
         let msg = ExecuteMsg::Rotate {finalized_slot: finalized_slot,
             participation: participation,

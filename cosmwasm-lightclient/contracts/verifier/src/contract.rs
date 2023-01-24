@@ -605,7 +605,7 @@ mod tests {
 
         let update = LightClientStep {
             finalized_slot: 4359840,
-            participation: 432u64,
+            participation: 432,
             finalized_header_root: hex::decode("70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653").unwrap(),
             execution_state_root: hex::decode("69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58").unwrap(),
             proof: proof

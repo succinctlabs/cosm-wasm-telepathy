@@ -149,16 +149,16 @@ pub mod execute {
         }
 
         let current_slot = current_slot(_env, deps.as_ref())?;
-        if current_slot < Uint256::from(update.finalized_slot) {
+        if current_slot < update.finalized_slot {
            return Err(ContractError::UpdateSlotTooFar {}); 
         }
 
-        let _res = set_head(deps.branch(), Uint256::from(update.finalized_slot), update.finalized_header_root);
+        let _res = set_head(deps.branch(), update.finalized_slot, update.finalized_header_root);
         if _res.is_err() {
             return Err(_res.err().unwrap())
         }
 
-        let _res = set_execution_state_root(deps.branch(), Uint256::from(update.finalized_slot), update.execution_state_root);
+        let _res = set_execution_state_root(deps.branch(), update.finalized_slot, update.execution_state_root);
         if _res.is_err() {
             return Err(_res.err().unwrap())
         }
@@ -175,9 +175,9 @@ pub mod execute {
     pub fn rotate(deps: DepsMut, update: LightClientRotate) -> Result<Response, ContractError>{
 
         let step = &update.step;
-        let finalized = process_step(deps.as_ref(), &step)?;
+        let finalized = process_step(deps.as_ref(), step)?;
 
-        let current_period = sync_committee_period(Uint256::from(step.finalized_slot), deps.as_ref())?;
+        let current_period = sync_committee_period(step.finalized_slot, deps.as_ref())?;
 
         let next_period = current_period + Uint256::from(1u64);
 
@@ -198,7 +198,7 @@ pub mod execute {
                 None => return Err(ContractError::BestUpdateNotInitialized {}),
             };
 
-            if Uint256::from(step.participation) < Uint256::from(best_update.step.participation) {
+            if step.participation < best_update.step.participation {
                 return Err(ContractError::ExistsBetterUpdate {});
             }
             set_best_update(deps, current_period, update);
@@ -257,12 +257,12 @@ pub mod query {
 
     pub fn get_sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<GetSyncCommitteePeriodResponse> {
         let period = sync_committee_period(slot, deps)?;
-        Ok(GetSyncCommitteePeriodResponse { period: period })
+        Ok(GetSyncCommitteePeriodResponse { period })
     }
 
     pub fn get_current_slot(_env: Env, deps: Deps) -> StdResult<GetCurrentSlotResponse> {
         let slot = current_slot(_env, deps)?;
-        Ok(GetCurrentSlotResponse { slot: slot })
+        Ok(GetCurrentSlotResponse { slot })
     }
 }
 
@@ -289,7 +289,7 @@ fn current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     let timestamp = Uint256::from(block.time.seconds());
     // TODO: Confirm this is timestamp in CosmWasm
     let current_slot = timestamp + state.genesis_time / state.seconds_per_slot;
-    return Ok(current_slot);
+    Ok(current_slot)
 }
 
 // HELPER FUNCTIONS
@@ -300,7 +300,7 @@ fn current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
 
 fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractError> {
     // Get current period
-    let current_period = sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
+    let current_period = sync_committee_period(update.finalized_slot, deps)?;
 
     // Load poseidon for period
     let _sync_committee_poseidon = match SYNC_COMMITTEE_POSEIDONS.may_load(deps.storage, current_period.to_string())? {
@@ -308,18 +308,18 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
         None => return Err(ContractError::SyncCommitteeNotInitialized {  }),
     };
 
-    if Uint256::from(update.participation) < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
+    if update.participation < Uint256::from(MIN_SYNC_COMMITTEE_PARTICIPANTS) {
         return Err(ContractError::NotEnoughSyncCommitteeParticipants { });
     }
 
     // TODO: Ensure zk_light_client_step is complete
-    let result = zk_light_client_step(deps, &update);
+    let result = zk_light_client_step(deps, update);
     if result.is_err() {
         return Err(result.err().unwrap());
     }
     
-    let enough_participation = Uint256::from(3u64) * Uint256::from(update.participation) > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
-    return Ok(enough_participation);
+    let enough_participation = Uint256::from(3u64) * update.participation > Uint256::from(2u64) * Uint256::from(SYNC_COMMITTEE_SIZE);
+    Ok(enough_participation)
 
 }
 
@@ -330,9 +330,9 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
     */
 fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), ContractError> {
     // Set up initial bytes
-    let finalized_slot_le = Uint256::from(update.finalized_slot).to_le_bytes();
-    let participation_le = Uint256::from(update.participation).to_le_bytes();
-    let current_period = sync_committee_period(Uint256::from(update.finalized_slot), deps)?;
+    let finalized_slot_le = update.finalized_slot.to_le_bytes();
+    let participation_le = update.participation.to_le_bytes();
+    let current_period = sync_committee_period(update.finalized_slot, deps)?;
     let sync_committee_poseidon = SYNC_COMMITTEE_POSEIDONS.load(deps.storage, current_period.to_string())?;
 
 
@@ -341,19 +341,19 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
     // sha256 & combine inputs
     temp[..32].copy_from_slice(&finalized_slot_le);
     temp[32..].copy_from_slice(&update.finalized_header_root);
-    h.copy_from_slice(&Sha256::digest(&temp));
+    h.copy_from_slice(&Sha256::digest(temp));
 
     temp[..32].copy_from_slice(&h);
     temp[32..].copy_from_slice(&participation_le);
-    h.copy_from_slice(&Sha256::digest(&temp));
+    h.copy_from_slice(&Sha256::digest(temp));
 
     temp[..32].copy_from_slice(&h);
     temp[32..].copy_from_slice(&update.execution_state_root);
-    h.copy_from_slice(&Sha256::digest(&temp));
+    h.copy_from_slice(&Sha256::digest(temp));
 
     temp[..32].copy_from_slice(&h);
     temp[32..].copy_from_slice(&sync_committee_poseidon);
-    h.copy_from_slice(&Sha256::digest(&temp));
+    h.copy_from_slice(&Sha256::digest(temp));
 
     // TODO: Confirm this is the correct math!
 
@@ -361,7 +361,7 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
     t[31] = 0b00011111;
 
     for i in 0..32 {
-        t[i] = t[i] & h[i];
+        t[i] &= h[i];
     }
 
     // Set proof
@@ -386,7 +386,7 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
     let public_signals = PublicSignals::from(inputs);
 
     let result = verifier.verify_proof(proof, &public_signals.get());
-    if result == false {
+    if !result {
         return Err(ContractError::InvalidStepProof { });
     }
 
@@ -394,7 +394,6 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
 
 }
 
-// TODO: Implement Logic
     /*
     * @dev Proof logic for rotate!
     */
@@ -435,16 +434,16 @@ fn zk_light_client_rotate(update: &LightClientRotate) -> Result<(), ContractErro
 
     let result = verifier.verify_proof(proof, &public_signals.get());
 
-    if result == false {
+    if !result {
         return Err(ContractError::InvalidRotateProof { });
     }
     Ok(())
 }
 
-fn vec_to_bytes(vec: &Vec<u8>) -> [u8; 32] {
+fn vec_to_bytes(vec: &[u8]) -> [u8; 32] {
     let mut bytes = [0u8; 32];
-    bytes.copy_from_slice(&vec);
-    return bytes;
+    bytes.copy_from_slice(vec);
+    bytes
 }
 
 // State interaction functions
@@ -469,7 +468,7 @@ fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>
     SYNC_COMMITTEE_POSEIDONS.save(deps.storage, period.to_string(), &poseidon)?;
 
     // TODO: Emit event
-    return Ok(())
+    Ok(())
 
 }
 
@@ -494,7 +493,7 @@ fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractE
     HEADERS.save(deps.storage, slot.to_string(), &root)?;
 
     // TODO: Add emit event for HeadUpdate
-    return Ok(())
+    Ok(())
 }
 
     /*
@@ -515,7 +514,7 @@ fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Resu
     }
 
     EXECUTION_STATE_ROOTS.save(deps.storage, slot.to_string(), &root)?;
-    return Ok(())
+    Ok(())
 }
 
     /*

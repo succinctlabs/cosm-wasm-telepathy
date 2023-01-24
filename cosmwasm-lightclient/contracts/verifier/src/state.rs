@@ -76,15 +76,6 @@ pub struct PublicSignals(pub Vec<String>);
 
 
 impl CircomProof {
-    pub fn default() -> Self {
-        CircomProof {
-            pi_a: vec!["0".to_string(), "0".to_string()],
-            pi_b: vec![vec!["0".to_string(), "0".to_string()], vec!["0".to_string(), "0".to_string()]],
-            pi_c: vec!["0".to_string(), "0".to_string()],
-            protocol: "groth16".to_string(),
-            curve: "bn254".to_string(),
-        }
-    }
 
     pub fn to_proof(self) -> Proof<Bn254> {
         // println!("pi_a: {:?}", self.pi_a);
@@ -119,14 +110,6 @@ impl CircomProof {
 impl PublicSignals {
     pub fn from(public_signals: Vec<String>) -> Self {
         PublicSignals(public_signals)
-    }
-    pub fn from_values(
-        combined_hash: String
-    ) -> Self {
-        let mut signals: Vec<String> = Vec::new();
-        signals.push(combined_hash);
-
-        PublicSignals(signals)
     }
 
     pub fn get(self) -> Vec<Fr> {

@@ -1,1 +1,13 @@
-{}
+{
+  "testnet": {
+    "verifier": {
+      "code_id": 5486,
+      "addresses": {
+        "default": "osmo1tayll068hvkrdke84t742cf8d0k9ckhlylgrw7gnslrlmpwvttlq8w29m0"
+      },
+      "proposal": {
+        "store_code": null
+      }
+    }
+  }
+}

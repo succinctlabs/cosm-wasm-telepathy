@@ -17,8 +17,30 @@ pub struct InstantiateMsg {
 /// Message type for 'execute' entry_point
 #[cw_serde]
 pub enum ExecuteMsg {
-    Step {update: LightClientStep},
-    Rotate {update: LightClientRotate},
+    Step {
+        finalized_slot: u64,
+        participation: u64,
+        finalized_header_root: Vec<u8>,
+        execution_state_root: Vec<u8>,
+        proof_a: Vec<String>,
+        proof_b: Vec<Vec<String>>,
+        proof_c: Vec<String>,
+    },
+    Rotate {
+        finalized_slot: u64,
+        participation: u64,
+        finalized_header_root: Vec<u8>,
+        execution_state_root: Vec<u8>,
+        step_proof_a: Vec<String>,
+        step_proof_b: Vec<Vec<String>>,
+        step_proof_c: Vec<String>,
+
+        sync_committee_ssz: Vec<u8>,
+        sync_committee_poseidon: Vec<u8>,
+        rotate_proof_a: Vec<String>,
+        rotate_proof_b: Vec<Vec<String>>,
+        rotate_proof_c: Vec<String>,
+    },
     Force {period: Uint256},
 }
 

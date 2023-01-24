@@ -6,7 +6,7 @@ use cw2::set_contract_version;
 use sha2::{Digest, Sha256};
 
 
-use crate::state::{STATE, State, CircomProof, LightClientStep, LightClientRotate, PublicSignals, HEADERS, EXECUTION_STATE_ROOTS, SYNC_COMMITTEE_POSEIDONS, BEST_UPDATES};
+use crate::state::{STATE, State, CircomProof, Groth16Proof, LightClientStep, LightClientRotate, PublicSignals, HEADERS, EXECUTION_STATE_ROOTS, SYNC_COMMITTEE_POSEIDONS, BEST_UPDATES};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::helpers::Verifier;
@@ -81,8 +81,53 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Step { update } => execute::step(_env, deps, update),
-        ExecuteMsg::Rotate { update } => execute::rotate(deps, update),
+        ExecuteMsg::Step { finalized_slot,
+            participation,
+            finalized_header_root,
+            execution_state_root,
+            proof_a,
+            proof_b,
+            proof_c, } => execute::step(_env, deps, LightClientStep {
+                finalized_slot,
+                participation,
+                finalized_header_root,
+                execution_state_root,
+                proof: Groth16Proof {
+                    a: proof_a,
+                    b: proof_b,
+                    c: proof_c,
+                }
+            }),
+        ExecuteMsg::Rotate { finalized_slot,
+            participation,
+            finalized_header_root,
+            execution_state_root,
+            step_proof_a,
+            step_proof_b,
+            step_proof_c,
+            sync_committee_ssz,
+            sync_committee_poseidon,
+            rotate_proof_a,
+            rotate_proof_b,
+            rotate_proof_c } => execute::rotate(deps, LightClientRotate { 
+                step: LightClientStep {
+                    finalized_slot,
+                    participation,
+                    finalized_header_root,
+                    execution_state_root,
+                    proof: Groth16Proof {
+                        a: step_proof_a,
+                        b: step_proof_b,
+                        c: step_proof_c,
+                    }
+                }, 
+                sync_committee_ssz: sync_committee_ssz, 
+                sync_committee_poseidon: sync_committee_poseidon, 
+                proof: Groth16Proof {
+                    a: rotate_proof_a,
+                    b: rotate_proof_b,
+                    c: rotate_proof_c,
+                } }),
         ExecuteMsg::Force { period } => execute::force(_env, deps, period),
     }
 }
@@ -567,7 +612,14 @@ mod tests {
         };
         println!("{:?}", update);
 
-        let msg = ExecuteMsg::Step {update: update};
+        let msg = ExecuteMsg::Step {finalized_slot: update.finalized_slot,
+            participation: update.participation,
+            finalized_header_root: update.finalized_header_root,
+            execution_state_root: update.execution_state_root,
+            proof_a: update.proof.a,
+            proof_b: update.proof.b,
+            proof_c: update.proof.c,};
+        
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         println!("{:?}", _res);
         // let value: Get = from_binary(&res).unwrap();
@@ -641,13 +693,25 @@ mod tests {
         };
 
         let update: LightClientRotate = LightClientRotate {
-            step: step,
+            // TODO: Fix this with borrow
+            step: step.clone(),
             sync_committee_ssz: hex::decode("c1c5193ee38508e60af26d51b83e2c6ba6934fd00d2bb8cb36e95d5402fbfc94").unwrap(),
             sync_committee_poseidon: Uint256::from_str("13340003662261458565835017692041308090002736850267009725732232370707087749826").unwrap().to_le_bytes().to_vec(),
             proof: ssz_proof, 
         };
 
-        let msg = ExecuteMsg::Rotate {update: update};
+        let msg = ExecuteMsg::Rotate {finalized_slot: step.finalized_slot,
+            participation: step.participation,
+            finalized_header_root: step.finalized_header_root,
+            execution_state_root: step.execution_state_root,
+            step_proof_a: step.proof.a,
+            step_proof_b: step.proof.b,
+            step_proof_c: step.proof.c,
+            sync_committee_ssz: update.sync_committee_ssz,
+            sync_committee_poseidon: update.sync_committee_poseidon,
+            rotate_proof_a: update.proof.a,
+            rotate_proof_b: update.proof.b,
+            rotate_proof_c: update.proof.c,};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // TODO: Perform query and confirm it completed a rotate

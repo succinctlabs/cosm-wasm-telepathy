@@ -113,20 +113,20 @@ pub fn execute(
                 step: LightClientStep {
                     finalized_slot: Uint256::from(finalized_slot),
                     participation: Uint256::from(participation),
-                    finalized_header_root,
-                    execution_state_root,
+                    finalized_header_root: finalized_header_root.to_vec(),
+                    execution_state_root: execution_state_root.to_vec(),
                     proof: Groth16Proof {
-                        a: step_proof_a,
-                        b: step_proof_b,
-                        c: step_proof_c,
+                        a: step_proof_a.to_vec(),
+                        b: vec![step_proof_b[0].to_vec(), step_proof_b[1].to_vec()],
+                        c: step_proof_c.to_vec(),
                     }
                 }, 
-                sync_committee_ssz: sync_committee_ssz, 
-                sync_committee_poseidon: sync_committee_poseidon, 
+                sync_committee_ssz: sync_committee_ssz.to_vec(), 
+                sync_committee_poseidon: sync_committee_poseidon.to_vec(), 
                 proof: Groth16Proof {
-                    a: rotate_proof_a,
-                    b: rotate_proof_b,
-                    c: rotate_proof_c,
+                    a: rotate_proof_a.to_vec(),
+                    b: vec![rotate_proof_b[0].to_vec(), rotate_proof_b[1].to_vec()],
+                    c: rotate_proof_c.to_vec(),
                 } }),
         ExecuteMsg::Force { period } => execute::force(_env, deps, Uint256::from(period)),
     }
@@ -699,7 +699,7 @@ mod tests {
             execution_state_root: hex::decode("ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb").unwrap(),
             proof: proof
         };
-
+        // println!("step: {:?}", step);
         let ssz_proof = Groth16Proof {
             a: vec!["19432175986645681540999611667567820365521443728844489852797484819167568900221".to_string(), "17819747348018194504213652705429154717568216715442697677977860358267208774881".to_string()],
             b: vec![vec!["19517979001366784491262985007208187156868482446794264383959847800886523509877".to_string(), "18685503971201701637279255177672737459369364286579884138384195256096640826544".to_string()], vec!["16475201747689810182851523453109345313415173394858409181213088485065940128783".to_string(), "12866135194889417072846904485239086915117156987867139218395654387586559304324".to_string()]],
@@ -713,19 +713,34 @@ mod tests {
             sync_committee_poseidon: Uint256::from_str("13340003662261458565835017692041308090002736850267009725732232370707087749826").unwrap().to_le_bytes().to_vec(),
             proof: ssz_proof, 
         };
+        println!("update: {:?}", update);
+
+        let finalized_header_root: [u8;32] = step.finalized_header_root.try_into().unwrap();
+        let execution_state_root: [u8;32] = step.execution_state_root.try_into().unwrap();
+
+        let step_proof_a: [String; 2] = step.proof.a.try_into().unwrap();
+        let step_proof_b: [[String; 2]; 2] = [step.proof.b[0].clone().try_into().unwrap(), step.proof.b[1].clone().try_into().unwrap()];
+        let step_proof_c: [String; 2] = step.proof.c.try_into().unwrap();
+
+        let sync_committee_ssz: [u8;32] = update.sync_committee_ssz.try_into().unwrap();
+        let sync_committee_poseidon: [u8;32] = update.sync_committee_poseidon.try_into().unwrap();
+
+        let rotate_proof_a: [String; 2] = update.proof.a.try_into().unwrap();
+        let rotate_proof_b: [[String; 2]; 2] = [update.proof.b[0].clone().try_into().unwrap(), update.proof.b[1].clone().try_into().unwrap()];
+        let rotate_proof_c: [String; 2] = update.proof.c.try_into().unwrap();
 
         let msg = ExecuteMsg::Rotate {finalized_slot: finalized_slot,
             participation: participation,
-            finalized_header_root: step.finalized_header_root,
-            execution_state_root: step.execution_state_root,
-            step_proof_a: step.proof.a,
-            step_proof_b: step.proof.b,
-            step_proof_c: step.proof.c,
-            sync_committee_ssz: update.sync_committee_ssz,
-            sync_committee_poseidon: update.sync_committee_poseidon,
-            rotate_proof_a: update.proof.a,
-            rotate_proof_b: update.proof.b,
-            rotate_proof_c: update.proof.c,};
+            finalized_header_root: finalized_header_root,
+            execution_state_root: execution_state_root,
+            step_proof_a: step_proof_a,
+            step_proof_b: step_proof_b,
+            step_proof_c: step_proof_c,
+            sync_committee_ssz: sync_committee_ssz,
+            sync_committee_poseidon: sync_committee_poseidon,
+            rotate_proof_a: rotate_proof_a,
+            rotate_proof_b: rotate_proof_b,
+            rotate_proof_c: rotate_proof_c,};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // TODO: Perform query and confirm it completed a rotate

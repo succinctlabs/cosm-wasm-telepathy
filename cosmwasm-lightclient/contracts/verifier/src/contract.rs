@@ -88,8 +88,8 @@ pub fn execute(
             proof_a,
             proof_b,
             proof_c, } => execute::step(_env, deps, LightClientStep {
-                finalized_slot,
-                participation,
+                finalized_slot: Uint256::from(finalized_slot),
+                participation: Uint256::from(participation),
                 finalized_header_root,
                 execution_state_root,
                 proof: Groth16Proof {
@@ -111,8 +111,8 @@ pub fn execute(
             rotate_proof_b,
             rotate_proof_c } => execute::rotate(deps, LightClientRotate { 
                 step: LightClientStep {
-                    finalized_slot,
-                    participation,
+                    finalized_slot: Uint256::from(finalized_slot),
+                    participation: Uint256::from(participation),
                     finalized_header_root,
                     execution_state_root,
                     proof: Groth16Proof {
@@ -128,7 +128,7 @@ pub fn execute(
                     b: rotate_proof_b,
                     c: rotate_proof_c,
                 } }),
-        ExecuteMsg::Force { period } => execute::force(_env, deps, period),
+        ExecuteMsg::Force { period } => execute::force(_env, deps, Uint256::from(period)),
     }
 }
 
@@ -545,10 +545,10 @@ mod tests {
         // TODO: Update default msg with values from Gnosis
         let msg = InstantiateMsg { 
             genesis_validators_root: vec![0; 32],
-            genesis_time: 0u64,
-            seconds_per_slot: 0u64,
-            slots_per_period: 0u64,
-            sync_committee_period: 0u64,
+            genesis_time: 0,
+            seconds_per_slot: 0,
+            slots_per_period: 0,
+            sync_committee_period: 0,
             sync_committee_poseidon: vec![0; 32], 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
@@ -602,18 +602,19 @@ mod tests {
             b: vec![vec!["11269943315518713067124801671029240901063146909738584854987772776806315890545".to_string(), "20094085308485991030092338753416508135313449543456147939097124612984047201335".to_string()], vec!["8122139689435793554974799663854817979475528090524378333920791336987132768041".to_string(), "5111528818556913201486596055325815760919897402988418362773344272232635103877".to_string()]],
             c: vec!["6410073677012431469384941862462268198904303371106734783574715889381934207004".to_string(), "11977981471972649035068934866969447415783144961145315609294880087827694234248".to_string()],
         };
-
+        let finalized_slot: u32 = 4359840;
+        let participation: u32 = 432;
         let update = LightClientStep {
-            finalized_slot: 4359840,
-            participation: 432,
+            finalized_slot: Uint256::from(finalized_slot),
+            participation: Uint256::from(participation),
             finalized_header_root: hex::decode("70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653").unwrap(),
             execution_state_root: hex::decode("69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58").unwrap(),
             proof: proof
         };
         println!("{:?}", update);
 
-        let msg = ExecuteMsg::Step {finalized_slot: update.finalized_slot,
-            participation: update.participation,
+        let msg = ExecuteMsg::Step {finalized_slot: finalized_slot,
+            participation: participation,
             finalized_header_root: update.finalized_header_root,
             execution_state_root: update.execution_state_root,
             proof_a: update.proof.a,
@@ -678,9 +679,11 @@ mod tests {
             c: vec!["9035222358509333553848504918662877956429157268124015769960938782858405579405".to_string(), "10878155942650055578211805190943912843265267774943864267206635407924778282720".to_string()],
         };
 
+        let finalized_slot: u32 = 4360032;
+        let participation: u32 = 413;
         let step = LightClientStep {
-            finalized_slot: 4360032,
-            participation: 413,
+            finalized_slot: Uint256::from(finalized_slot),
+            participation: Uint256::from(participation),
             finalized_header_root: hex::decode("b6c60352d13b5a1028a99f11ec314004da83c9dbc58b7eba72ae71b3f3373c30").unwrap(),
             execution_state_root: hex::decode("ef6dc7ca7a8a7d3ab379fa196b1571398b0eb9744e2f827292c638562090f0cb").unwrap(),
             proof: proof
@@ -700,8 +703,8 @@ mod tests {
             proof: ssz_proof, 
         };
 
-        let msg = ExecuteMsg::Rotate {finalized_slot: step.finalized_slot,
-            participation: step.participation,
+        let msg = ExecuteMsg::Rotate {finalized_slot: finalized_slot,
+            participation: participation,
             finalized_header_root: step.finalized_header_root,
             execution_state_root: step.execution_state_root,
             step_proof_a: step.proof.a,
@@ -741,9 +744,9 @@ mod tests {
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
 
-        let period = Uint256::from(0u64);
+        // let period = Uint256::from(0u64);
 
-        let msg = ExecuteMsg::Force {period: period};
+        let msg = ExecuteMsg::Force {period: 0};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // should complete a force operation

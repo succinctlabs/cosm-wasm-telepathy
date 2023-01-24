@@ -45,8 +45,8 @@ pub struct BeaconBlockHeader {
 
 #[cw_serde]
 pub struct LightClientStep {
-    pub finalized_slot: u64,
-    pub participation: u64,
+    pub finalized_slot: Uint256,
+    pub participation: Uint256,
     pub finalized_header_root: Vec<u8>,
     pub execution_state_root: Vec<u8>,
     pub proof: Groth16Proof,

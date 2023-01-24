@@ -7,10 +7,10 @@ use crate::state::{LightClientStep, LightClientRotate};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub genesis_validators_root: Vec<u8>,
-    pub genesis_time: u64,
-    pub seconds_per_slot: u64,
-    pub slots_per_period: u64,
-    pub sync_committee_period: u64,
+    pub genesis_time: u32,
+    pub seconds_per_slot: u32,
+    pub slots_per_period: u32,
+    pub sync_committee_period: u32,
     pub sync_committee_poseidon: Vec<u8>,
 }
 
@@ -18,8 +18,8 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Step {
-        finalized_slot: u64,
-        participation: u64,
+        finalized_slot: u32,
+        participation: u32,
         finalized_header_root: Vec<u8>,
         execution_state_root: Vec<u8>,
         proof_a: Vec<String>,
@@ -27,8 +27,8 @@ pub enum ExecuteMsg {
         proof_c: Vec<String>,
     },
     Rotate {
-        finalized_slot: u64,
-        participation: u64,
+        finalized_slot: u32,
+        participation: u32,
         finalized_header_root: Vec<u8>,
         execution_state_root: Vec<u8>,
         step_proof_a: Vec<String>,
@@ -41,7 +41,7 @@ pub enum ExecuteMsg {
         rotate_proof_b: Vec<Vec<String>>,
         rotate_proof_c: Vec<String>,
     },
-    Force {period: Uint256},
+    Force {period: u32},
 }
 
 /// Message type for `migrate` entry_point

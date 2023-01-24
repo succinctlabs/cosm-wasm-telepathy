@@ -9,7 +9,7 @@ use std::str::{FromStr};
 
 use crate::state::{STATE, State, CircomProof, Groth16Proof, LightClientStep, LightClientRotate, PublicSignals, HEADERS, EXECUTION_STATE_ROOTS, SYNC_COMMITTEE_POSEIDONS, BEST_UPDATES};
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::helpers::Verifier;
 
 // version info for migration info

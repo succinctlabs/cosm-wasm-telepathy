@@ -45,7 +45,7 @@ pub fn instantiate(
 
     };
     STATE.save(deps.storage, &state)?;
-    // Set sync committee poseidon
+
     // TODO: Propogate error up
     let _response = set_sync_committee_poseidon(deps.branch(), Uint256::from(msg.sync_committee_period), msg.sync_committee_poseidon.to_vec());
 
@@ -210,7 +210,8 @@ pub mod execute {
     /*
     * @dev In the case that there is no finalization for a sync committee
     * rotation, applies the update with the most signatures throughout the
-    * period.
+    * period. 
+    * @todo: Add more details on how this works
     */
     pub fn force(_env: Env, deps: DepsMut, period: Uint256) -> Result<Response, ContractError>{
         // TODO: Check if deps.as_ref() is correct
@@ -276,7 +277,86 @@ pub fn reply(_deps: DepsMut, _env: Env, _msg: Reply) -> Result<Response, Contrac
     todo!()
 }
 
-// View functions
+/* STATE INTERACTION FUNCTIONS */
+
+/*
+* @dev Sets the sync committee validator set root for the next sync
+* committee period. If the root is already set and the new root does not
+* match, the contract is marked as inconsistent. Otherwise, we store the
+* root and emit an event.
+*/
+fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
+    let mut state = STATE.load(deps.storage)?;
+
+    let poseidon_for_period = match SYNC_COMMITTEE_POSEIDONS.may_load(deps.storage, period.to_string())?{
+        Some(poseidon) => poseidon,
+        None => vec![0; 32],
+    };   
+    if poseidon_for_period != [0; 32] && poseidon_for_period != poseidon {
+        state.consistent = false;
+        return Ok(())
+    }
+    SYNC_COMMITTEE_POSEIDONS.save(deps.storage, period.to_string(), &poseidon)?;
+
+    // TODO: Add emit event for SyncCommitteePoseidonUpdate
+    Ok(())
+
+}
+
+    /*
+     * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
+     */
+fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
+    let mut state = STATE.load(deps.storage)?;
+
+    let root_for_slot = match HEADERS.may_load(deps.storage, slot.to_string())?{
+        Some(root) => root,
+        None => vec![0; 32],
+    };
+    // If sync committee does not exist    
+    if root_for_slot != vec![0; 32] && root_for_slot != root {
+        state.consistent = false;
+        return Ok(())
+    }
+
+    state.head = slot;
+
+    HEADERS.save(deps.storage, slot.to_string(), &root)?;
+
+    // TODO: Add emit event for HeadUpdate
+    Ok(())
+}
+
+    /*
+     * @dev Update execution root as long as it is consistent with the current head or 
+     * it is the execution root for the slot.
+     */
+fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
+    let mut state = STATE.load(deps.storage)?;
+
+    let root_for_slot = match EXECUTION_STATE_ROOTS.may_load(deps.storage, slot.to_string())?{
+        Some(root) => root,
+        None => vec![0; 32],
+    };
+    // If sync committee does not exist    
+    if root_for_slot != vec![0; 32] && root_for_slot != root {
+        state.consistent = false;
+        return Ok(())
+    }
+
+    EXECUTION_STATE_ROOTS.save(deps.storage, slot.to_string(), &root)?;
+    Ok(())
+}
+
+    /*
+     * @dev Save the best update for the period.
+     */
+fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
+    let period_str = period.to_string();
+    // TODO: Confirm save is the correct usage
+    let _res = BEST_UPDATES.save(deps.storage, period_str, &update);
+}
+
 
 fn sync_committee_period(slot: Uint256, deps: Deps) -> StdResult<Uint256> {
     let state = STATE.load(deps.storage)?;
@@ -292,12 +372,13 @@ fn current_slot(_env: Env, deps: Deps) -> StdResult<Uint256> {
     Ok(current_slot)
 }
 
-// HELPER FUNCTIONS
 
-    /*
-    * @dev Check validity of conditions for a light client step update.
-    */
 
+/* CORE LOGIC FUNCTIONS */
+
+/*
+* @dev Check validity of conditions for a light client step update.
+*/
 fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractError> {
     // Get current period
     let current_period = sync_committee_period(update.finalized_slot, deps)?;
@@ -324,10 +405,10 @@ fn process_step(deps: Deps, update: &LightClientStep) -> Result<bool, ContractEr
 }
 
 
-// TODO: Implement Logic
-    /*
-    * @dev Proof logic for step!
-    */
+/*
+* @dev Proof logic for verifying a step. Generate the combined hash (public input for the circuit),
+* initialize a verifier, and verify the proof.
+*/
 fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), ContractError> {
     // Set up initial bytes
     let finalized_slot_le = update.finalized_slot.to_le_bytes();
@@ -394,9 +475,11 @@ fn zk_light_client_step(deps: Deps, update: &LightClientStep) -> Result<(), Cont
 
 }
 
-    /*
-    * @dev Proof logic for rotate!
-    */
+/*
+* @dev Proof logic for verifying a rotate. Generate the public inputs from the sync_commitee_ssz big endian bytes,
+* the finalized_header_root big endian bytes and the sync committee's poseidon hash. Initialize a verifier, 
+* and verify the proof.
+*/
 fn zk_light_client_rotate(update: &LightClientRotate) -> Result<(), ContractError> {
 
     let mut inputs = vec!["0".to_string(); 65];
@@ -440,93 +523,17 @@ fn zk_light_client_rotate(update: &LightClientRotate) -> Result<(), ContractErro
     Ok(())
 }
 
+
+/* HELPER FUNCTIONS */
+
+/*
+* @dev Converts a vector to bytes.
+*/
 fn vec_to_bytes(vec: &[u8]) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(vec);
     bytes
 }
-
-// State interaction functions
-
-    /*
-     * @dev Sets the sync committee validator set root for the next sync
-     * committee period. If the root is already set and the new root does not
-     * match, the contract is marked as inconsistent. Otherwise, we store the
-     * root and emit an event.
-     */
-fn set_sync_committee_poseidon(deps: DepsMut, period: Uint256, poseidon: Vec<u8>) -> Result<(), ContractError> {
-    let mut state = STATE.load(deps.storage)?;
-
-    let poseidon_for_period = match SYNC_COMMITTEE_POSEIDONS.may_load(deps.storage, period.to_string())?{
-        Some(poseidon) => poseidon,
-        None => vec![0; 32],
-    };   
-    if poseidon_for_period != [0; 32] && poseidon_for_period != poseidon {
-        state.consistent = false;
-        return Ok(())
-    }
-    SYNC_COMMITTEE_POSEIDONS.save(deps.storage, period.to_string(), &poseidon)?;
-
-    // TODO: Emit event
-    Ok(())
-
-}
-
-    /*
-     * @dev Update the head of the client after checking for the existence of signatures and valid proofs.
-     */
-fn set_head(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
-    let mut state = STATE.load(deps.storage)?;
-
-    let root_for_slot = match HEADERS.may_load(deps.storage, slot.to_string())?{
-        Some(root) => root,
-        None => vec![0; 32],
-    };
-    // If sync committee does not exist    
-    if root_for_slot != vec![0; 32] && root_for_slot != root {
-        state.consistent = false;
-        return Ok(())
-    }
-
-    state.head = slot;
-
-    HEADERS.save(deps.storage, slot.to_string(), &root)?;
-
-    // TODO: Add emit event for HeadUpdate
-    Ok(())
-}
-
-    /*
-     * @dev Update execution root as long as it is consistent with the current head or 
-     * it is the execution root for the slot.
-     */
-fn set_execution_state_root(deps: DepsMut, slot: Uint256, root: Vec<u8>) -> Result<(), ContractError> {
-    let mut state = STATE.load(deps.storage)?;
-
-    let root_for_slot = match EXECUTION_STATE_ROOTS.may_load(deps.storage, slot.to_string())?{
-        Some(root) => root,
-        None => vec![0; 32],
-    };
-    // If sync committee does not exist    
-    if root_for_slot != vec![0; 32] && root_for_slot != root {
-        state.consistent = false;
-        return Ok(())
-    }
-
-    EXECUTION_STATE_ROOTS.save(deps.storage, slot.to_string(), &root)?;
-    Ok(())
-}
-
-    /*
-     * @dev Save the best update for the period.
-     */
-fn set_best_update(deps: DepsMut, period: Uint256, update: LightClientRotate) {
-    let period_str = period.to_string();
-    // TODO: Confirm save is the correct usage
-    let _res = BEST_UPDATES.save(deps.storage, period_str, &update);
-}
-
-
 
 
 #[cfg(test)]
@@ -557,10 +564,6 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // TODO: it worked, let's query the state
-        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        // let value: GetCountResponse = from_binary(&res).unwrap();
-        // assert_eq!(17, value.count);
     }
 
     #[test]
@@ -609,14 +612,8 @@ mod tests {
             proof_c: proof_c};
         
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        println!("{:?}", _res);
         // let value: Get = from_binary(&res).unwrap();
 
-        // should complete a step
-
-        // let res = execute(deps.as_ref(), mock_env(), ExecuteMsg::Step {update}).unwrap();
-        // let value: GetCountResponse = from_binary(&res).unwrap();
-        // assert_eq!(18, value.count);
     }
 
     // Following testRotate in LightClient.t.sol
@@ -644,24 +641,7 @@ mod tests {
         let info = mock_info("anyone", &coins(2, "token"));
 
 
-        // uint256[2] memory a = [
-        //     2389393404492058253160068022258603729350770245558596428430133000235269498543,
-        //     10369223312690872346127509312343439494640770569110984786213351208635909948543
-        // ];
-        // uint256[2][2] memory b = [
-        //     [
-        //         10181085549071219170085204492459257955822340639736743687662735377741773005552,
-        //         11815959921059098071620606293769973610509565967606374482200288258603855668773
-        //     ],
-        //     [
-        //         14404189974461708010365785617881368513005872936409632496299813856721680720909,
-        //         4596699114942981172597823241348081341260261170814329779716288274614793962155
-        //     ]
-        // ];
-        // uint256[2] memory c = [
-        //     9035222358509333553848504918662877956429157268124015769960938782858405579405,
-        //     10878155942650055578211805190943912843265267774943864267206635407924778282720
-        // ];
+
 
         let proof = Groth16Proof {
             a: vec!["2389393404492058253160068022258603729350770245558596428430133000235269498543".to_string(), "10369223312690872346127509312343439494640770569110984786213351208635909948543".to_string()],
@@ -671,7 +651,7 @@ mod tests {
 
         let finalized_slot: u32 = 4360032;
         let participation: u32 = 413;
-        // println!("step: {:?}", step);
+
         let ssz_proof = Groth16Proof {
             a: vec!["19432175986645681540999611667567820365521443728844489852797484819167568900221".to_string(), "17819747348018194504213652705429154717568216715442697677977860358267208774881".to_string()],
             b: vec![vec!["19517979001366784491262985007208187156868482446794264383959847800886523509877".to_string(), "18685503971201701637279255177672737459369364286579884138384195256096640826544".to_string()], vec!["16475201747689810182851523453109345313415173394858409181213088485065940128783".to_string(), "12866135194889417072846904485239086915117156987867139218395654387586559304324".to_string()]],
@@ -708,9 +688,6 @@ mod tests {
 
         // TODO: Perform query and confirm it completed a rotate
 
-        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        // let value: GetCountResponse = from_binary(&res).unwrap();
-        // assert_eq!(18, value.count);
     }
 
     #[test]
@@ -740,8 +717,5 @@ mod tests {
 
         // should complete a force operation
 
-        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        // let value: GetCountResponse = from_binary(&res).unwrap();
-        // assert_eq!(18, value.count);
     }
 }

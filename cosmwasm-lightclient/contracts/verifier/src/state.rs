@@ -13,7 +13,6 @@ use cw_storage_plus::{Item,Map};
 
 #[cw_serde]
 pub struct State {
-    // TODO: Fix with Uint256 (not sure if hash fn supported)
 
     pub consistent: bool,
     pub head: Uint256,
@@ -78,7 +77,6 @@ pub struct PublicSignals(pub Vec<String>);
 impl CircomProof {
 
     pub fn to_proof(self) -> Proof<Bn254> {
-        // println!("pi_a: {:?}", self.pi_a);
         let a = G1Affine::new(
             Fp256::from_str(&self.pi_a[0]).unwrap(),
             Fp256::from_str(&self.pi_a[1]).unwrap(),
@@ -105,8 +103,6 @@ impl CircomProof {
     }
 }
 
-// Public signals from circom
-// public [combinedHash]
 impl PublicSignals {
     pub fn from(public_signals: Vec<String>) -> Self {
         PublicSignals(public_signals)
@@ -120,19 +116,8 @@ impl PublicSignals {
         inputs
     }
 
-    // fn bech32_to_u256(addr: String) -> String {
-    //     if addr == "" || addr == "0" {
-    //         return "0".to_string();
-    //     }
-    //     let (_, payloads, _) = bech32::decode(&addr).unwrap();
-
-    //     let words: Vec<u8> = payloads.iter().map(|x| x.to_u8()).collect();
-    //     // TODO: take a look at a cleaner way
-    //     Uint256::from_be_bytes(words.try_into().unwrap()).to_string()
-    // }
 }
 
-// Taking in a string of the uint256 for all of the below
 pub const HEADERS: Map<String, Vec<u8>> = Map::new("headers");
 pub const EXECUTION_STATE_ROOTS: Map<String, Vec<u8>> = Map::new("execution_state_roots");
 pub const SYNC_COMMITTEE_POSEIDONS: Map<String, Vec<u8>> = Map::new("sync_committee_poseidons");

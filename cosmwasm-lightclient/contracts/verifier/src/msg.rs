@@ -4,12 +4,12 @@ use cosmwasm_std::{Uint256};
 /// Message type for `instantiate` entry_point
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub genesis_validators_root: [u8; 32],
+    pub genesis_validators_root: String,
     pub genesis_time: u32,
     pub seconds_per_slot: u32,
     pub slots_per_period: u32,
     pub sync_committee_period: u32,
-    pub sync_committee_poseidon: [u8; 32],
+    pub sync_committee_poseidon: String,
 }
 
 /// Message type for 'execute' entry_point

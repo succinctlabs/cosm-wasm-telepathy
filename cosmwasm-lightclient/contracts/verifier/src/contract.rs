@@ -32,9 +32,8 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
     let state: State = State {
-        genesis_validators_root: msg.genesis_validators_root.to_vec(),
+        genesis_validators_root: hex::decode(msg.genesis_validators_root).unwrap(),
         genesis_time: Uint256::from(msg.genesis_time),
         seconds_per_slot: Uint256::from(msg.seconds_per_slot),
         slots_per_period: Uint256::from(msg.slots_per_period),
@@ -47,7 +46,7 @@ pub fn instantiate(
     STATE.save(deps.storage, &state)?;
 
     // TODO: Propogate error up
-    let _response = set_sync_committee_poseidon(deps.branch(), Uint256::from(msg.sync_committee_period), msg.sync_committee_poseidon.to_vec());
+    let _response = set_sync_committee_poseidon(deps.branch(), Uint256::from(msg.sync_committee_period), Uint256::from_str(&msg.sync_committee_poseidon).unwrap().to_le_bytes().to_vec());
 
 
 
@@ -551,12 +550,12 @@ mod tests {
 
         // TODO: Update default msg with values from Gnosis
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: "0".to_string(),
             genesis_time: 0,
             seconds_per_slot: 0,
             slots_per_period: 0,
             sync_committee_period: 0,
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: "0".to_string(), 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -570,15 +569,13 @@ mod tests {
     fn step() {
         let mut deps = mock_dependencies();
 
-        let genesis_validators_root: [u8; 32] = hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap().try_into().unwrap();
-        let sync_committee_poseidon: [u8; 32] = Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes();
         let msg = InstantiateMsg { 
-            genesis_validators_root: genesis_validators_root,
+            genesis_validators_root: "043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb".to_string(),
             genesis_time: 1616508000,
             seconds_per_slot: 12,
             slots_per_period: 8192,
             sync_committee_period: 532,
-            sync_committee_poseidon: sync_committee_poseidon,
+            sync_committee_poseidon: "7032059424740925146199071046477651269705772793323287102921912953216115444414".to_string(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -621,16 +618,13 @@ mod tests {
     fn rotate() {
         let mut deps = mock_dependencies();
 
-        let genesis_validators_root: [u8; 32] = hex::decode("043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb").unwrap().try_into().unwrap();
-        let sync_committee_poseidon: [u8; 32] = Uint256::from_str("7032059424740925146199071046477651269705772793323287102921912953216115444414").unwrap().to_le_bytes();
-
         let msg = InstantiateMsg { 
-            genesis_validators_root: genesis_validators_root,
+            genesis_validators_root: "043db0d9a83813551ee2f33450d23797757d430911a9320530ad8a0eabc43efb".to_string(),
             genesis_time: 1616508000,
             seconds_per_slot: 12,
             slots_per_period: 8192,
             sync_committee_period: 532,
-            sync_committee_poseidon: sync_committee_poseidon,
+            sync_committee_poseidon: "7032059424740925146199071046477651269705772793323287102921912953216115444414".to_string(),
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 
@@ -695,12 +689,12 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg { 
-            genesis_validators_root: [0; 32],
+            genesis_validators_root: "0".to_string(),
             genesis_time: 1616508000,
             seconds_per_slot: 12,
             slots_per_period: 8192,
             sync_committee_period: 532,
-            sync_committee_poseidon: [0; 32], 
+            sync_committee_poseidon: "0".to_string(), 
         };
         let info = mock_info("creator", &coins(1000, "earth"));
 

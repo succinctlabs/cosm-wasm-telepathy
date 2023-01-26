@@ -26,8 +26,8 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
     contractAddress: string;
     sender: string;
     step: ({ executionStateRoot, finalizedHeaderRoot, finalizedSlot, participation, proofA, proofB, proofC }: {
-        executionStateRoot: number[];
-        finalizedHeaderRoot: number[];
+        executionStateRoot: string;
+        finalizedHeaderRoot: string;
         finalizedSlot: number;
         participation: number;
         proofA: string[];
@@ -35,8 +35,8 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
         proofC: string[];
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
     rotate: ({ executionStateRoot, finalizedHeaderRoot, finalizedSlot, participation, rotateProofA, rotateProofB, rotateProofC, stepProofA, stepProofB, stepProofC, syncCommitteePoseidon, syncCommitteeSsz }: {
-        executionStateRoot: number[];
-        finalizedHeaderRoot: number[];
+        executionStateRoot: string;
+        finalizedHeaderRoot: string;
         finalizedSlot: number;
         participation: number;
         rotateProofA: string[];
@@ -45,11 +45,11 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
         stepProofA: string[];
         stepProofB: string[][];
         stepProofC: string[];
-        syncCommitteePoseidon: number[];
-        syncCommitteeSsz: number[];
+        syncCommitteePoseidon: string;
+        syncCommitteeSsz: string;
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
     force: ({ period }: {
-        period: Uint256;
+        period: number;
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
 }
 export declare class VerifierClient extends VerifierQueryClient implements VerifierInterface {
@@ -58,8 +58,8 @@ export declare class VerifierClient extends VerifierQueryClient implements Verif
     contractAddress: string;
     constructor(client: SigningCosmWasmClient, sender: string, contractAddress: string);
     step: ({ executionStateRoot, finalizedHeaderRoot, finalizedSlot, participation, proofA, proofB, proofC }: {
-        executionStateRoot: number[];
-        finalizedHeaderRoot: number[];
+        executionStateRoot: string;
+        finalizedHeaderRoot: string;
         finalizedSlot: number;
         participation: number;
         proofA: string[];
@@ -67,8 +67,8 @@ export declare class VerifierClient extends VerifierQueryClient implements Verif
         proofC: string[];
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
     rotate: ({ executionStateRoot, finalizedHeaderRoot, finalizedSlot, participation, rotateProofA, rotateProofB, rotateProofC, stepProofA, stepProofB, stepProofC, syncCommitteePoseidon, syncCommitteeSsz }: {
-        executionStateRoot: number[];
-        finalizedHeaderRoot: number[];
+        executionStateRoot: string;
+        finalizedHeaderRoot: string;
         finalizedSlot: number;
         participation: number;
         rotateProofA: string[];
@@ -77,11 +77,11 @@ export declare class VerifierClient extends VerifierQueryClient implements Verif
         stepProofA: string[];
         stepProofB: string[][];
         stepProofC: string[];
-        syncCommitteePoseidon: number[];
-        syncCommitteeSsz: number[];
+        syncCommitteePoseidon: string;
+        syncCommitteeSsz: string;
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
     force: ({ period }: {
-        period: Uint256;
+        period: number;
     }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
 }
 //# sourceMappingURL=Verifier.client.d.ts.map

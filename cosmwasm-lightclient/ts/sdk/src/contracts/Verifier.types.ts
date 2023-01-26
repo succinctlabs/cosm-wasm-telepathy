@@ -6,43 +6,42 @@
 
 export interface InstantiateMsg {
   genesis_time: number;
-  genesis_validators_root: number[];
+  genesis_validators_root: string;
   seconds_per_slot: number;
   slots_per_period: number;
   sync_committee_period: number;
-  sync_committee_poseidon: number[];
+  sync_committee_poseidon: string;
 }
 export type ExecuteMsg = {
   step: {
-    execution_state_root: number[];
-    finalized_header_root: number[];
+    execution_state_root: string;
+    finalized_header_root: string;
     finalized_slot: number;
     participation: number;
-    proof_a: string[];
-    proof_b: string[][];
-    proof_c: string[];
+    proof_a: [string, string];
+    proof_b: [[string, string], [string, string]];
+    proof_c: [string, string];
   };
 } | {
   rotate: {
-    execution_state_root: number[];
-    finalized_header_root: number[];
+    execution_state_root: string;
+    finalized_header_root: string;
     finalized_slot: number;
     participation: number;
-    rotate_proof_a: string[];
-    rotate_proof_b: string[][];
-    rotate_proof_c: string[];
-    step_proof_a: string[];
-    step_proof_b: string[][];
-    step_proof_c: string[];
-    sync_committee_poseidon: number[];
-    sync_committee_ssz: number[];
+    rotate_proof_a: [string, string];
+    rotate_proof_b: [[string, string], [string, string]];
+    rotate_proof_c: [string, string];
+    step_proof_a: [string, string];
+    step_proof_b: [[string, string], [string, string]];
+    step_proof_c: [string, string];
+    sync_committee_poseidon: string;
+    sync_committee_ssz: string;
   };
 } | {
   force: {
-    period: Uint256;
+    period: number;
   };
 };
-export type Uint256 = string;
 export type QueryMsg = {
   get_sync_committee_period: {
     slot: Uint256;
@@ -50,6 +49,7 @@ export type QueryMsg = {
 } | {
   get_current_slot: {};
 };
+export type Uint256 = string;
 export type MigrateMsg = string;
 export interface GetCurrentSlotResponse {
   slot: Uint256;

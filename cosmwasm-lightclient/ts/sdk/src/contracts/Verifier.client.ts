@@ -6,7 +6,7 @@
 
 import { CosmWasmClient, SigningCosmWasmClient, ExecuteResult } from "@cosmjs/cosmwasm-stargate";
 import { Coin, StdFee } from "@cosmjs/amino";
-import { InstantiateMsg, ExecuteMsg, Uint256, QueryMsg, MigrateMsg, GetCurrentSlotResponse, GetSyncCommitteePeriodResponse } from "./Verifier.types";
+import { InstantiateMsg, ExecuteMsg, QueryMsg, Uint256, MigrateMsg, GetCurrentSlotResponse, GetSyncCommitteePeriodResponse } from "./Verifier.types";
 export interface VerifierReadOnlyInterface {
   contractAddress: string;
   getSyncCommitteePeriod: ({
@@ -56,8 +56,8 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
     proofB,
     proofC
   }: {
-    executionStateRoot: number[];
-    finalizedHeaderRoot: number[];
+    executionStateRoot: string;
+    finalizedHeaderRoot: string;
     finalizedSlot: number;
     participation: number;
     proofA: string[];
@@ -78,8 +78,8 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
     syncCommitteePoseidon,
     syncCommitteeSsz
   }: {
-    executionStateRoot: number[];
-    finalizedHeaderRoot: number[];
+    executionStateRoot: string;
+    finalizedHeaderRoot: string;
     finalizedSlot: number;
     participation: number;
     rotateProofA: string[];
@@ -88,13 +88,13 @@ export interface VerifierInterface extends VerifierReadOnlyInterface {
     stepProofA: string[];
     stepProofB: string[][];
     stepProofC: string[];
-    syncCommitteePoseidon: number[];
-    syncCommitteeSsz: number[];
+    syncCommitteePoseidon: string;
+    syncCommitteeSsz: string;
   }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
   force: ({
     period
   }: {
-    period: Uint256;
+    period: number;
   }, fee?: number | StdFee | "auto", memo?: string, funds?: Coin[]) => Promise<ExecuteResult>;
 }
 export class VerifierClient extends VerifierQueryClient implements VerifierInterface {
@@ -121,8 +121,8 @@ export class VerifierClient extends VerifierQueryClient implements VerifierInter
     proofB,
     proofC
   }: {
-    executionStateRoot: number[];
-    finalizedHeaderRoot: number[];
+    executionStateRoot: string;
+    finalizedHeaderRoot: string;
     finalizedSlot: number;
     participation: number;
     proofA: string[];
@@ -155,8 +155,8 @@ export class VerifierClient extends VerifierQueryClient implements VerifierInter
     syncCommitteePoseidon,
     syncCommitteeSsz
   }: {
-    executionStateRoot: number[];
-    finalizedHeaderRoot: number[];
+    executionStateRoot: string;
+    finalizedHeaderRoot: string;
     finalizedSlot: number;
     participation: number;
     rotateProofA: string[];
@@ -165,8 +165,8 @@ export class VerifierClient extends VerifierQueryClient implements VerifierInter
     stepProofA: string[];
     stepProofB: string[][];
     stepProofC: string[];
-    syncCommitteePoseidon: number[];
-    syncCommitteeSsz: number[];
+    syncCommitteePoseidon: string;
+    syncCommitteeSsz: string;
   }, fee: number | StdFee | "auto" = "auto", memo?: string, funds?: Coin[]): Promise<ExecuteResult> => {
     return await this.client.execute(this.sender, this.contractAddress, {
       rotate: {
@@ -188,7 +188,7 @@ export class VerifierClient extends VerifierQueryClient implements VerifierInter
   force = async ({
     period
   }: {
-    period: Uint256;
+    period: number;
   }, fee: number | StdFee | "auto" = "auto", memo?: string, funds?: Coin[]): Promise<ExecuteResult> => {
     return await this.client.execute(this.sender, this.contractAddress, {
       force: {

@@ -28,3 +28,6 @@ pnpmfile.js
 # Log files.
 *.log
 *.log.*
+
+# Env variables
+.env

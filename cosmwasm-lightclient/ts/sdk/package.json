@@ -64,6 +64,7 @@
     "abi-decoder": "^2.4.0",
     "chain-registry": "^1.6.1",
     "cosmjs-utils": "^0.1.0",
+    "dotenv": "^16.0.3",
     "osmojs": "^13.0.0-rc.7-i-alpha"
   }
 }

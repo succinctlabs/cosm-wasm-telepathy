@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import { CosmWasmClient, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { OfflineSigner, GeneratedType, Registry } from "@cosmjs/proto-signing";
 import {DirectSecp256k1HdWallet} from "@cosmjs/proto-signing";
@@ -8,6 +10,8 @@ import { getOfflineSignerAmino } from 'cosmjs-utils';
 import { signAndBroadcast } from '@osmonauts/helpers';
 import { chains } from 'chain-registry';
 import { AminoTypes, SigningStargateClient } from "@cosmjs/stargate";
+
+
 const { Dec, IntPretty } = require("@keplr-wallet/unit");
 const { toUtf8 } = require("@cosmjs/encoding");
 
@@ -48,11 +52,19 @@ const blockTime = 2; // 2 seconds
 const timeToLive = 60 * 60; // 1 hour
 
 const rpcEndpoint = "https://rpc-test.osmosis.zone:443"; // or another URL
-const mnemonic = "head comic random slam craft sell scatter elder huge intact egg cattle physical barely upon outdoor any vacuum donate account chronic vague walnut melt";
+
+const mnemonic = process.env['MNEMONIC'];
+if (!mnemonic) {
+    throw new Error("Set MNEMONIC in your environment");
+}
 const OSMO_CONTRACT_ADDRESS = "osmo1q5v3dka7vc5klvnpzxhm00202x7lr2h24c704yqlnsupxtzlrcgs70g68p";
 const sender = "osmo1wg7gwnuaxcfyyfqpsf823xkeev4ewq50qke68e";
 
-const API_KEY = "UXWF8656D21Q617YDZ87DGNTVP89VS4DCX";
+const API_KEY = process.env['POLYGONSCAN_API_KEY'];
+if (!API_KEY) {
+    throw new Error("Set POLYGONSCAN_API_KEY in your environment");
+}
+// console.log(API_KEY);
 
 type Step = {
     finalized_slot: number;
@@ -111,7 +123,7 @@ async function getPolygonLightClientUpdates() {
 
     res = await axios.get("https://api.polygonscan.com/api", { params: getLightClientUpdateParams });
 
-    // console.log(res.data.result);
+    console.log(res.data.result);
 
     var foundStep = false;
     var foundRotate = false;
@@ -231,8 +243,8 @@ const execute = async (type: string) => {
                     "668677161502286101563894714981729964194699570006131833735785056716286587846"
                 ],
                 step_proof_b: [[
-                    "9073189333002641268699898880423427884530312520574836079650585601729939523257",
-                    "4073805207134898136028891237384563804393104225852773591359494267405532929823"
+                        "9073189333002641268699898880423427884530312520574836079650585601729939523257",
+                        "4073805207134898136028891237384563804393104225852773591359494267405532929823"
                     ],
                     [
                         "6012292475434631765688755681738413806573283060443036082585341787059807703445",
@@ -292,8 +304,8 @@ const execute = async (type: string) => {
     const tx = await client.signAndBroadcast(sender.address, [msg], fee);
     console.log(tx.transactionHash);
 };
-// getPolygonLightClientUpdates();
-execute("rotate");
+getPolygonLightClientUpdates();
+// execute("rotate");
 // async function updateOsmosisLightClient() {
 
 //     // const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);

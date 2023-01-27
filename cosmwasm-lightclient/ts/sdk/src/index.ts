@@ -123,7 +123,7 @@ async function getPolygonLightClientUpdates() {
 
     res = await axios.get("https://api.polygonscan.com/api", { params: getLightClientUpdateParams });
 
-    console.log(res.data.result);
+    // console.log(res.data.result);
 
     var foundStep = false;
     var foundRotate = false;
@@ -142,8 +142,8 @@ async function getPolygonLightClientUpdates() {
                 const step: Step = {
                     finalized_slot: decodedInput.update.finalizedSlot.toNumber(),
                     participation: decodedInput.update.participation.toNumber(),
-                    finalized_header_root: decodedInput.update.finalizedHeaderRoot,
-                    execution_state_root: decodedInput.update.executionStateRoot,
+                    finalized_header_root: decodedInput.update.finalizedHeaderRoot.replace("0x", "").toLowerCase(),
+                    execution_state_root: decodedInput.update.executionStateRoot.replace("0x", "").toLowerCase(),
                     proof_a: conv(decodedInput.update.proof.a),
                     proof_b: conv(decodedInput.update.proof.b),
                     proof_c: conv(decodedInput.update.proof.c)
@@ -163,17 +163,17 @@ async function getPolygonLightClientUpdates() {
                 const step: Step = {
                     finalized_slot: decodedInput.update.step.finalizedSlot.toNumber(),
                     participation: decodedInput.update.step.participation.toNumber(),
-                    finalized_header_root: decodedInput.update.step.finalizedHeaderRoot,
-                    execution_state_root: decodedInput.update.step.executionStateRoot,
+                    finalized_header_root: decodedInput.update.step.finalizedHeaderRoot.replace("0x", "").toLowerCase(),
+                    execution_state_root: decodedInput.update.step.executionStateRoot.replace("0x", "").toLowerCase(),
                     proof_a: conv(decodedInput.update.step.proof.a),
                     proof_b: conv(decodedInput.update.step.proof.b),
                     proof_c: conv(decodedInput.update.step.proof.c)
                 }
                 const rotate: Rotate = {
                     step: step,
-                    sync_committee_ssz: decodedInput.update.syncCommitteeSSZ,
+                    sync_committee_ssz: decodedInput.update.syncCommitteeSSZ.replace("0x", "").toLowerCase(),
                     // TODO: CONVERT TO A BIG NUMBER
-                    sync_committee_poseidon: decodedInput.update.syncCommitteePoseidon,
+                    sync_committee_poseidon: BigInt(decodedInput.update.syncCommitteePoseidon).toString(10),
                     proof_a: conv(decodedInput.update.proof.a),
                     proof_b: conv(decodedInput.update.proof.b),
                     proof_c: conv(decodedInput.update.proof.c)

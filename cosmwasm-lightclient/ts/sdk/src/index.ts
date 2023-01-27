@@ -94,7 +94,7 @@ function conv(arr: any) {
     })
 }
 
-async function getPolygonLightClientUpdates() {
+async function getPolygonLightClientUpdates(executeFlag: boolean) {
     // Get current timestamp
     const now = Math.floor(Date.now() / 1000);
 
@@ -150,6 +150,11 @@ async function getPolygonLightClientUpdates() {
                 }
                 console.log(step);
 
+                // Execute polygon step tx on Osmosis
+                if (executeFlag) {
+                    await execute("step", step, undefined);
+                }
+
 
                 foundStep = true;
             }
@@ -180,6 +185,12 @@ async function getPolygonLightClientUpdates() {
                 }
                 console.log("Rotate", rotate)
                 console.log("Rotate Step", rotate.step);
+
+                // Execute polygon rotate tx on Osmosis
+                if (executeFlag) {
+                    await execute("rotate", undefined, rotate);
+                }
+
                 foundRotate = true;
             }
         }
@@ -195,7 +206,7 @@ const chain = chains.find(({ chain_name }) => chain_name === "osmosistestnet");
 // const mnemonic = "<MNEMONIC>";
 const contractAddress = "<CONTRACT_ADDRESS>";
 
-const execute = async (type: string) => {
+const execute = async (type: string, step?: Step, rotate?: Rotate) => {
     const chain: any = chains.find(({ chain_name }) => chain_name === 'osmosis');
     const signer = await getOfflineSignerAmino({ mnemonic, chain });
     const rpcEndpoint = "https://rpc-test.osmosis.zone:443";
@@ -210,72 +221,31 @@ const execute = async (type: string) => {
     let raw;
     if (type == "step") {
         raw = {step: {
-            proof_a: [
-                '11615329083473960992128771606806176302546966364412380447650480685095571936958',
-                '2281247970071569462274353077438743272476535637671476850473256181863734012702'
-            ],
-            proof_b: [[
-                '18305192230769288908736007603632911621855044310287042254218011468623673723399',
-                '5251973268907993188476337278706887604258187030264761912857355235415313364744'
-            ], [
-                '6850472048099850156682893507512366982725072599067846678807675735813593979408',
-                '11215731197748460247324302977723918666979026500987890455930385040107458565713'
-            ]],
-            proof_c: [
-                '12793492554536042198863380854903485491687707191489735849428107264231552201753',
-                '4328029698850132503014972253449487359040744460425843328572797660470326494516'
-            ],
-            finalized_slot: 4359840,
-            participation: 416,
-            finalized_header_root: "70d0a7f53a459dd88eb37c6cfdfb8c48f120e504c96b182357498f2691aa5653",
-            execution_state_root: "69d746cb81cd1fb4c11f4dcc04b6114596859b518614da0dd3b4192ff66c3a58",
+            proof_a: step?.proof_a,
+            proof_b: step?.proof_b,
+            proof_c: step?.proof_c,
+            finalized_slot: step?.finalized_slot,
+            participation: step?.participation,
+            finalized_header_root: step?.finalized_header_root,
+            execution_state_root: step?.execution_state_root,
         }};
     }
     if (type == "rotate") {
         raw = {
             rotate: {
-                finalized_header_root: "ef6ac7fd64dfe5311e994d2d1bef7532162bb83df0ffa93aed8b7a1d876c9670",
-                execution_state_root: "0d19c73db3d1b20946d47a372b3e376e1da4607451522ad166d8d840205a0977",
-                finalized_slot: 4841568,
-                participation: 406,
-                step_proof_a: [
-                    "17678200247500807915516442069459263088688298014440878779370203204485297243253",
-                    "668677161502286101563894714981729964194699570006131833735785056716286587846"
-                ],
-                step_proof_b: [[
-                        "9073189333002641268699898880423427884530312520574836079650585601729939523257",
-                        "4073805207134898136028891237384563804393104225852773591359494267405532929823"
-                    ],
-                    [
-                        "6012292475434631765688755681738413806573283060443036082585341787059807703445",
-                        "3988751551327405857482391952699873259320818097811951693746348585549859448238"
-                    ]
-                ],
-                step_proof_c: [
-                    "1293517260713858648315711015178474091429022666655280377869546884043721024877",
-                    "10971067119950847415454909217256035076207158562093894610502962586019231251061"
-                    ],
+                finalized_header_root: rotate?.step.finalized_header_root,
+                execution_state_root: rotate?.step.execution_state_root,
+                finalized_slot: rotate?.step.finalized_slot,
+                participation: rotate?.step.participation,
+                step_proof_a: rotate?.step.proof_a,
+                step_proof_b: rotate?.step.proof_b,
+                step_proof_c: rotate?.step.proof_c,
 
-                sync_committee_ssz: "ece3a90db275591ded5146c189400fded5d22c2172aec024efb9bbf97403c69f",
-                sync_committee_poseidon: "7713204134344712740643862736510976272912240228517853413817897082105185485572",
-                rotate_proof_a: [
-                    "5815760768428739075475041501977714867101348194003275868836008635786051999559",
-                    "12178538775250372475190722621652880649580939797574824323064618635500969555648"
-                ],
-                rotate_proof_b: [
-                    [
-                        "742273729738604373134116051946278924657216843994040206189563573392105915153",
-                        "11920648287489181765675191279352944615295161881956443662899340256326363630799"
-                    ],
-                    [
-                        "21495024500447707741460968189511157808759208163037085057710725587254206405843",
-                        "3491785396664780208364954448336595088815216570168964120153286399627564098952"
-                    ]
-                ],
-                rotate_proof_c: [
-                    "6670165410898599100691713737541277970065783443873463768654322697125408086809",
-                    "14835034623172130750342550543897539948635510100558562354315317329752367166837"
-                ],
+                sync_committee_ssz: rotate?.sync_committee_ssz,
+                sync_committee_poseidon: rotate?.sync_committee_poseidon,
+                rotate_proof_a: rotate?.proof_a,
+                rotate_proof_b: rotate?.proof_b,
+                rotate_proof_c: rotate?.proof_c,
             }
         }
     
@@ -304,7 +274,8 @@ const execute = async (type: string) => {
     const tx = await client.signAndBroadcast(sender.address, [msg], fee);
     console.log(tx.transactionHash);
 };
-getPolygonLightClientUpdates();
+
+getPolygonLightClientUpdates(true);
 // execute("rotate");
 // async function updateOsmosisLightClient() {
 
